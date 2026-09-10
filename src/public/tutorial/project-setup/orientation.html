@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orientation: the domain model and stack — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/project-setup/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/project-setup/index.html">Lesson 1: Project Setup, Schema &amp; Authentication</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Orientation: the domain model and stack</span>
+          
+        
+      </nav>
+    
+
+    <h1>Orientation: the domain model and stack</h1>
+    <p class="lede">The book review catalogue&#39;s domain model, the Docker environment it runs in, and what this lesson will actually build.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Before any code changes, it's worth being able to answer two questions:
+<em>what</em> are we building, and <em>what's already running</em> underneath it. This
+page covers both, then lays out the rest of this lesson.</p>
+<h2>The domain model</h2>
+<p>The app is a book review catalogue, built around four things:</p>
+<ul>
+<li>A <strong>User</strong> can write many <strong>Reviews</strong>.</li>
+<li>A <strong>Book</strong> can have many Reviews — but at most <strong>one Review per User per
+Book</strong>. That's not just a rule the app remembers to enforce; it's backed
+by a unique constraint in the database itself, so it holds even if a bug
+elsewhere tries to violate it. You'll build that constraint in this
+lesson's migrations topic.</li>
+<li>A <strong>Book</strong> can have many <strong>Authors</strong>, and an Author can have written many
+Books — a many-to-many relationship, which needs a join table (<code>author_book</code>)
+in between. If you've drawn an entity-relationship diagram for a
+many-to-many before, this is exactly that shape.</li>
+<li>A real catalogue would usually give a Book many <strong>Editions</strong> (different
+ISBNs, publishers, print runs). This app doesn't — a book's edition
+details (ISBN, publisher, price, edition number) live directly on the
+<code>books</code> table, so every Book has exactly one implicit edition. That's a
+deliberate simplification to keep the schema to a size this course's six
+weeks can comfortably cover, not an oversight.</li>
+</ul>
+<p>In short:</p>
+<pre><code class="hljs">User ──&lt; Review &gt;── Book ──&lt; author_book &gt;── Author
+        (1 per user            (many-to-many)
+         per book)
+</code></pre>
+<p><strong>One thing this model deliberately does <em>not</em> do yet</strong>: nothing about
+<em>roles</em>. Every registered user has exactly the same permissions — there's
+no &quot;admin&quot; who can edit any book, no distinction beyond &quot;logged in&quot; or not.
+That's authentication (proving who you are), which Breeze gives you later
+in this lesson. <em>Authorization</em> — what a given user is allowed to do — only
+shows up in a narrow, manual form in Lesson 4 (you'll only be able to edit
+or delete your own reviews), and the general-purpose version of it isn't
+built at all in this six-week block. If that sounds like it's punting on
+something, it is, on purpose — it's a deliberate boundary for what these
+six weeks cover, not a gap you're meant to work around.</p>
+<h2>The stack, and what's already running</h2>
+<p>If you haven't already worked through the <strong>First-time setup</strong> steps in
+this project's <code>README.md</code>, do that now — the rest of this lesson assumes
+<code>docker compose up -d --build</code> has been run at least once, <code>composer install</code> and <code>npm install &amp;&amp; npm run build</code> have completed inside the
+workspace container, and <code>php artisan migrate</code> has run without error.</p>
+<p>That setup brings up four Docker Compose services, defined in
+<code>compose.yaml</code> and the <code>docker/</code> folder alongside it:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>What it is</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apache-php-container</code></td>
+<td>Serves the Laravel app</td>
+<td>http://localhost:8080</td>
+</tr>
+<tr>
+<td><code>mysql-container</code></td>
+<td>MySQL 8, holding the app's database</td>
+<td><code>localhost:3306</code></td>
+</tr>
+<tr>
+<td><code>phpmyadmin-container</code></td>
+<td>phpMyAdmin, for browsing that database</td>
+<td>http://localhost:8081</td>
+</tr>
+<tr>
+<td><code>workspace-container</code></td>
+<td>A terminal for <code>php artisan</code>, <code>composer</code>, <code>npm</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>This is the same shape of environment you used last year, so none of it
+should be unfamiliar: one container serves the app, one runs the database,
+one gives you a browser-based way to look inside that database. The one
+addition is <code>workspace-container</code> — it doesn't serve anything itself, it's
+just a shell (<code>docker compose exec workspace-container bash</code>) with PHP,
+Composer, and Node installed, so you have somewhere to run command-line
+tools without needing them inside the container that's serving live
+traffic.</p>
+<p>Right now, with first-time setup done, you should be able to see:</p>
+<ul>
+<li><strong>The Laravel app</strong>, at http://localhost:8080 — Laravel's own default
+welcome page. Nothing app-specific yet; that's what this lesson starts
+building.</li>
+<li><strong>phpMyAdmin</strong>, at http://localhost:8081 — log in and you'll find a
+<code>book_reviews</code> database already containing a handful of tables
+(<code>users</code>, <code>sessions</code>, <code>cache</code>, <code>jobs</code>, and a few others) that Laravel
+creates by default. No <code>books</code>, <code>authors</code>, or <code>reviews</code> tables yet —
+those come from migrations you're about to write.</li>
+<li><strong>The workspace</strong>, reachable only via <code>docker compose exec workspace-container bash</code> — no URL, since it isn't a web server. This is
+where every <code>php artisan</code> and <code>composer</code> command in this lesson gets
+run.</li>
+</ul>
+<h2>Where the Laravel app itself came from</h2>
+<p>The project in <code>src/</code> already exists, so you won't run this yourself — but
+it's worth knowing what created it, because you'll see this command again
+on your own projects. <code>laravel new .</code> scaffolds a fresh Laravel project
+into the current directory, and asks a handful of setup questions along
+the way. This project answered:</p>
+<ul>
+<li><strong>No starter kit</strong> — no built-in auth scaffolding yet. That's what
+Breeze, installed separately later in this lesson, adds.</li>
+<li><strong>PHPUnit</strong> for testing, not the alternative Pest.</li>
+<li><strong>MySQL</strong> as the database, matching the <code>mysql-container</code> service above.</li>
+</ul>
+<p>What you get back is a <em>bare</em> Laravel installation: the framework, its
+default folder structure, and three default migrations (for <code>users</code>,
+<code>cache</code>, and <code>jobs</code>) — but no Breeze, no app-specific models or
+migrations. Laravel does scaffold one model and one factory by default,
+though: <code>User</code> (<code>app/Models/User.php</code>) and <code>UserFactory</code>
+(<code>database/factories/UserFactory.php</code>), both generic and both there
+before you write a single line of app-specific code. That's exactly the
+state <code>src/</code> is in right now — <code>users</code>, <code>cache</code>, and <code>jobs</code> tables, a
+<code>User</code> model, a <code>UserFactory</code>, and nothing yet for <code>books</code>, <code>authors</code>, or
+<code>reviews</code> — and exactly what the rest of this lesson builds on top of.</p>
+<h2>What this lesson does</h2>
+<p>By the end of this lesson, working from that bare starting point, you'll
+have:</p>
+<ol>
+<li><strong>Installed Breeze</strong>, adding registration, login, logout, and
+password-reset views and routes — real authentication, not a stub.</li>
+<li><strong>Written and run migrations</strong> for the full schema above: <code>books</code>,
+<code>authors</code>, the <code>author_book</code> pivot, and <code>reviews</code>, alongside Breeze's
+<code>users</code> migration.</li>
+<li><strong>Written the Eloquent model classes</strong> for each of those tables, with
+the relationships between them (<code>Book::authors()</code>, <code>Author::books()</code>,
+<code>Book::reviews()</code>, and so on) — if you've written a hand-rolled
+Active-Record-style model class before, this will feel like a very
+close relative, not something brand new.</li>
+<li><strong>Written this lesson's first tests</strong>, proving the schema and the
+relationships actually work.</li>
+</ol>
+<p>A <strong>migration</strong> is a version-controlled PHP class describing one schema
+change — &quot;create this table,&quot; &quot;add that column&quot; — rather than a change
+you'd hand-make in phpMyAdmin. Running <code>php artisan migrate</code> applies every
+migration that hasn't run yet, in order, so the database's structure lives
+in code and git alongside the models and tests that depend on it.</p>
+</div>
+    
+  </main>
+</body>
+</html>
