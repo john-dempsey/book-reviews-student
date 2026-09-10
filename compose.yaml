@@ -1,0 +1,70 @@
+# The .env beside this file is a duplicate of src/.env (Laravel's own
+# .env) — kept here purely so Docker Compose auto-discovers it for the
+# ${VAR} interpolation below (container_name, the MYSQL_*/PMA_*
+# mappings) without needing --env-file on every command. The two files
+# must stay identical — see the comment at the top of either one.
+
+services:
+  mysql-container:
+    image: mysql:8.0
+    container_name: ${DB_HOST}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql/data:/var/lib/mysql
+    networks:
+      - devnet
+
+  phpmyadmin-container:
+    build: ./docker/phpmyadmin
+    container_name: phpmyadmin
+    environment:
+      PMA_HOST: ${DB_HOST}
+      PMA_USER: ${DB_USERNAME}
+      PMA_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "8081:80"
+    networks:
+      - devnet
+    depends_on:
+      - mysql-container
+
+  # Serves the Laravel application (DocumentRoot: public/)
+  apache-php-container:
+    build: ./docker/apache-php
+    container_name: webapp
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - devnet
+    depends_on:
+      - mysql-container
+
+  # No server process of its own — this is where students get a terminal
+  # to run `php artisan`, `composer`, and `npm` commands against the same
+  # ./src bind mount apache-php-container serves.
+  workspace-container:
+    build: ./docker/workspace
+    container_name: workspace
+    ports:
+      - "5173:5173"   # Vite dev server, if `npm run dev` is used for live CSS/JS reload
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    networks:
+      - devnet
+    depends_on:
+      - mysql-container
+
+networks:
+  devnet:
+    driver: bridge

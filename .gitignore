@@ -1,0 +1,12 @@
+# MySQL's actual on-disk data files — never versioned
+/docker/mysql/data/
+
+# Laravel's own ignores (vendor/, node_modules/, public/build, etc.)
+# arrive with `laravel new .` inside src/ in Lesson 1 and live in
+# src/.gitignore — a separate file from this one, since Laravel now
+# lives in its own subfolder rather than at this root.
+#
+# One line in that generated src/.gitignore needs removing: Laravel's
+# default ignores /.env, but src/.env is committed on purpose here (see
+# the comment at the top of that file) — delete that line once it's
+# generated.
