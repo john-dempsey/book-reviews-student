@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Laravel application structure — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/project-setup/orientation.html">← Orientation: the domain model and stack</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/project-setup/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/project-setup/index.html">Lesson 1: Project Setup, Schema &amp; Authentication</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">The Laravel application structure</span>
+          
+        
+      </nav>
+    
+
+    <h1>The Laravel application structure</h1>
+    <p class="lede">A guided tour of the bare install: URL rewriting and the front controller, MVC at a glance, routing, where Models/Controllers/Views live, the public folder, the database folder and .env, and how tests fit in.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Before writing any app-specific code, it's worth knowing the shape of what
+<code>laravel new .</code> already gave you, and how a request actually travels
+through it. Everything on this page already exists in <code>src/</code> right now —
+you're touring, not building yet. That starts with the next topic.</p>
+<h2>URL rewriting: one file answers every request</h2>
+<p>In the prior PHP module, a URL usually pointed at a real <code>.php</code> file on
+disk — <code>/about.php</code> served <code>about.php</code>. Laravel doesn't work that way.
+Apache's document root points at <code>src/public/</code>, and that folder contains
+an <code>.htaccess</code> file with a rewrite rule at the bottom of it:</p>
+<pre><code class="hljs language-apache"><span class="hljs-attribute">RewriteCond</span> <span class="hljs-variable">%{REQUEST_FILENAME}</span> !-d
+<span class="hljs-attribute">RewriteCond</span> <span class="hljs-variable">%{REQUEST_FILENAME}</span> !-f
+<span class="hljs-attribute">RewriteRule</span> ^ index.php<span class="hljs-meta"> [L]</span>
+</code></pre>
+<p>Read as English: <em>if the requested path isn't a real directory and isn't a
+real file, rewrite it to <code>index.php</code> instead.</em> So <code>/books</code>, <code>/books/3</code>, and
+<code>/anything-that-doesn't-exist-as-a-file</code> all end up running the exact same
+PHP file — <code>public/index.php</code>, Laravel's <strong>front controller</strong>. Its actual
+job is short:</p>
+<pre><code class="hljs language-php"><span class="hljs-variable">$app</span> = <span class="hljs-keyword">require_once</span> <span class="hljs-keyword">__DIR__</span>.<span class="hljs-string">&#x27;/../bootstrap/app.php&#x27;</span>;
+
+<span class="hljs-variable">$app</span>-&gt;<span class="hljs-title function_ invoke__">handleRequest</span>(<span class="hljs-title class_">Request</span>::<span class="hljs-title function_ invoke__">capture</span>());
+</code></pre>
+<p>It boots the framework, hands it the incoming request, and lets Laravel
+decide what to do with it. Nothing about <em>which</em> code runs is decided by
+the URL rewriting itself — that's the router's job, covered next. The
+rewrite rule's only job is making sure every request that isn't a real
+file gets to Laravel at all.</p>
+<h2>MVC, at a glance</h2>
+<p>Laravel is a <strong>Model-View-Controller</strong> framework — not by forcing rigid
+separation, but by giving each part its own folder and convention:</p>
+<ul>
+<li>A <strong>Model</strong> represents one thing your data cares about (a <code>Book</code>, a
+<code>Review</code>) and knows how to load and save its own rows. You've written
+something in this shape by hand already.</li>
+<li>A <strong>View</strong> turns data into the actual HTML response — a <strong>Blade</strong>
+template here, not plain PHP <code>echo</code> statements.</li>
+<li>A <strong>Controller</strong> sits between the two: a request arrives, the
+Controller asks a Model for whatever data it needs, then hands that
+data to a View to render.</li>
+</ul>
+<p>Strung together, one request looks like this:</p>
+<pre><code class="hljs">Browser → routes/web.php → Controller → Model (talks to the database)
+                                ↓
+                             Blade View → HTML back to the browser
+</code></pre>
+<p>The router decides <em>which</em> Controller (or closure) handles a given URL —
+that's the piece still missing from the picture above.</p>
+<h2>Routing: where a URL is decided</h2>
+<p><code>routes/web.php</code> is where a URL pattern gets matched to the code that
+handles it. Right now, it holds exactly one route:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-string">&#x27;/&#x27;</span>, function () {
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;welcome&#x27;</span>);
+});
+</code></pre>
+<p><code>Route::get()</code> matches <code>GET</code> requests to the given path (<code>/</code>); the second
+argument is what runs when it matches — here, a closure that returns a
+View directly. Once there's a real Controller worth calling, that second
+argument becomes a reference to one of its methods instead of an inline
+closure — you'll see that shift happen later in this lesson, once Breeze
+and this app's own Controllers exist. (<code>routes/console.php</code> also exists,
+for defining custom <code>artisan</code> commands — nothing in this course uses it.)</p>
+<h2>Where things live</h2>
+<table>
+<thead>
+<tr>
+<th>Folder</th>
+<th>What lives there</th>
+<th>What's already there</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app/Models/</code></td>
+<td>Eloquent model classes, one per database table</td>
+<td><code>User.php</code></td>
+</tr>
+<tr>
+<td><code>app/Http/Controllers/</code></td>
+<td>Controller classes</td>
+<td><code>Controller.php</code> — an empty base class every controller will extend</td>
+</tr>
+<tr>
+<td><code>resources/views/</code></td>
+<td>Blade templates (<code>.blade.php</code>)</td>
+<td><code>welcome.blade.php</code></td>
+</tr>
+<tr>
+<td><code>routes/web.php</code></td>
+<td>Maps URLs to closures or controller methods</td>
+<td>The one route above</td>
+</tr>
+<tr>
+<td><code>database/migrations/</code></td>
+<td>One file per schema change, applied in order</td>
+<td><code>users</code>, <code>cache</code>, <code>jobs</code></td>
+</tr>
+<tr>
+<td><code>config/</code></td>
+<td>One PHP file per subsystem, each reading its values from <code>.env</code></td>
+<td><code>database.php</code>, among many others</td>
+</tr>
+<tr>
+<td><code>public/</code></td>
+<td>Anything Apache serves directly</td>
+<td><code>index.php</code>, plus the static content below</td>
+</tr>
+<tr>
+<td><code>artisan</code></td>
+<td>Laravel's command-line entry point — a single file, not a folder</td>
+<td>Every <code>php artisan ...</code> command runs through it</td>
+</tr>
+</tbody>
+</table>
+<p>Almost all of the code you write for the rest of this course lands in the
+first four rows.</p>
+<h2>The <code>artisan</code> CLI</h2>
+<p><code>artisan</code> is the file behind every command-line interaction you'll have
+with Laravel this course: <code>php artisan migrate</code> (mentioned at the end of
+the last topic), <code>php artisan make:model</code>, <code>php artisan tinker</code> for
+poking at models interactively, and more as the course goes on. It isn't
+a folder holding code you'll write yourself — it's the command-line
+interface, dispatching to code that already exists inside the framework
+or your own app. You'll always run it from the workspace container's
+terminal, never from your own machine directly.</p>
+<h2>The public folder and static content</h2>
+<p><code>public/</code> is the one folder Apache's document root points at directly —
+anything in it is reachable by URL, whether or not Laravel is involved.
+<code>index.php</code> is the front controller from earlier; alongside it sit files
+Apache just serves as-is, with no PHP and no routing: <code>favicon.ico</code>,
+<code>robots.txt</code>, and <code>public/build/</code>, where Vite drops the compiled
+CSS/JS once Breeze's asset pipeline is running.</p>
+<p>There's a concrete example one click away: the tutorial site you're
+reading right now is a folder of plain HTML and CSS sitting at
+<code>public/tutorial/</code>. It didn't come through a route or a Controller —
+Apache found a real file on disk at the requested path and served it
+directly, the same way it would serve <code>favicon.ico</code>. That's the whole
+distinction between &quot;static content&quot; and &quot;the app&quot;: whether the request
+finds a real file in <code>public/</code> first, or falls through to <code>index.php</code>.</p>
+<h2>The database folder and <code>.env</code></h2>
+<p><code>database/migrations/</code> is where the migrations mentioned at the end of the
+last topic actually live — right now, just the three Laravel ships by
+default (<code>users</code>, <code>cache</code>, <code>jobs</code>). <code>database/factories/</code> and
+<code>database/seeders/</code> exist too, holding only the default <code>UserFactory</code> for
+now; you won't touch either folder for real until Lesson 2.</p>
+<p>Laravel reads its database connection details from <code>.env</code>, not from a
+config file you'd edit directly:</p>
+<pre><code class="hljs">DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_DATABASE=book_reviews
+DB_USERNAME=laravel
+</code></pre>
+<p><code>config/</code> is where those <code>.env</code> values actually get consumed — one PHP
+file per subsystem (<code>app.php</code>, <code>database.php</code>, <code>session.php</code>, and more),
+each reading <code>env()</code> calls into plain PHP arrays that the rest of Laravel
+uses. <code>config/database.php</code> specifically is the bridge for the block
+above, and it's why changing a <code>DB_*</code> value in <code>.env</code> changes which
+database <code>php artisan migrate</code> talks to, with no other file to edit.
+<code>DB_HOST=mysql</code> here is the same <code>mysql-container</code> you saw running in
+phpMyAdmin in the last topic — this <code>.env</code> is how Laravel knows to look
+for it there instead of on your own machine.</p>
+<h2>Testing</h2>
+<p><code>tests/</code> splits into <code>tests/Unit/</code> and <code>tests/Feature/</code>, both extending
+the shared <code>tests/TestCase.php</code>. Unit tests check one class in isolation —
+a model's relationships, for example; feature tests make real HTTP
+requests against a route and check the response, closer to how a browser
+would actually use the app. Both run against the same MySQL database the
+app itself uses — there's no separate, lighter test database here — with
+the <code>RefreshDatabase</code> trait resetting it between tests so one test's data
+never leaks into the next.</p>
+<p>Right now <code>tests/</code> is essentially empty — this lesson's first real tests
+are its very last topic, once there's an actual schema and actual models
+worth testing.</p>
+</div>
+    
+  </main>
+</body>
+</html>
