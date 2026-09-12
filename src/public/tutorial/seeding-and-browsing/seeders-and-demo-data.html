@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seeders and demo data — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/seeding-and-browsing/writing-factories.html">← Writing factories</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/seeding-and-browsing/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/seeding-and-browsing/index.html">Lesson 2: Seeding &amp; Browsing the Catalogue</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Seeders and demo data</span>
+          
+        
+      </nav>
+    
+
+    <h1>Seeders and demo data</h1>
+    <p class="lede">Turning last topic&#39;s ad hoc factory calls into a repeatable command that builds a whole believable catalogue in one go - one seeder per model, wired together in an order that matters, and the ReviewFactory default that has to be worked around to make it happen.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Everything the last topic built - <code>AuthorFactory</code>, <code>BookFactory</code>,
+<code>ReviewFactory</code> - still only runs when someone types a command in
+<code>tinker</code>. Nothing produces the whole catalogue at once: a fixed number of
+users and authors, books attached to the right authors, reviews attached
+to the right books and users, all in one go. That's what a <strong>seeder</strong>
+does - a class that scripts a batch of factory calls (and whatever else
+is needed) into one repeatable command.</p>
+<h2>Creating a seeder</h2>
+<pre><code class="hljs">php artisan make:seeder AuthorSeeder
+</code></pre>
+<pre><code class="hljs language-php"><span class="hljs-meta">&lt;?php</span>
+
+<span class="hljs-keyword">namespace</span> <span class="hljs-title class_">Database</span>\<span class="hljs-title class_">Seeders</span>;
+
+<span class="hljs-keyword">use</span> <span class="hljs-title">Illuminate</span>\<span class="hljs-title">Database</span>\<span class="hljs-title">Console</span>\<span class="hljs-title">Seeds</span>\<span class="hljs-title">WithoutModelEvents</span>;
+<span class="hljs-keyword">use</span> <span class="hljs-title">Illuminate</span>\<span class="hljs-title">Database</span>\<span class="hljs-title">Seeder</span>;
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">AuthorSeeder</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Seeder</span>
+</span>{
+    <span class="hljs-comment">/**
+     * Run the database seeds.
+     */</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+    </span>{
+        <span class="hljs-comment">//</span>
+    }
+}
+</code></pre>
+<p>An empty <code>run()</code> method, waiting to be filled in - the generator also
+imports <code>WithoutModelEvents</code>, a trait that's only actually needed on the
+top-level <code>DatabaseSeeder</code> (more on that below), so that unused import
+gets deleted from every seeder except the one that needs it.</p>
+<p>Rather than writing everything inside <code>DatabaseSeeder</code> directly, this app
+gets <strong>one seeder per model</strong> - <code>UserSeeder</code>, <code>AuthorSeeder</code>,
+<code>BookSeeder</code>, <code>ReviewSeeder</code> - the same instinct as one migration per
+table back in Lesson 1: each file stays short enough to read in one
+glance, and it's obvious which one to open when only the reviews need
+changing.</p>
+<p>The two simplest ones barely do more than call a factory:</p>
+<pre><code class="hljs language-php"><span class="hljs-comment">// AuthorSeeder.php</span>
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">factory</span>(<span class="hljs-number">5</span>)-&gt;<span class="hljs-title function_ invoke__">create</span>();
+}
+</code></pre>
+<pre><code class="hljs language-php"><span class="hljs-comment">// UserSeeder.php</span>
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$users</span> = [
+        [<span class="hljs-string">&#x27;name&#x27;</span> =&gt; <span class="hljs-string">&#x27;Emma Watson&#x27;</span>, <span class="hljs-string">&#x27;email&#x27;</span> =&gt; <span class="hljs-string">&#x27;emma.watson84@example.com&#x27;</span>],
+        [<span class="hljs-string">&#x27;name&#x27;</span> =&gt; <span class="hljs-string">&quot;Liam O&#x27;Connor&quot;</span>, <span class="hljs-string">&#x27;email&#x27;</span> =&gt; <span class="hljs-string">&#x27;liam.oconnor22@example.com&#x27;</span>],
+        <span class="hljs-comment">// ...</span>
+    ];
+
+    <span class="hljs-keyword">foreach</span> (<span class="hljs-variable">$users</span> <span class="hljs-keyword">as</span> <span class="hljs-variable">$user</span>) {
+        <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-variable">$user</span>);
+    }
+}
+</code></pre>
+<p><code>UserSeeder</code> overrides <code>name</code> and <code>email</code> on every call so the five
+accounts are recognisable rather than randomly generated - everything
+else (the password, the verified-at timestamp) still comes from
+<code>UserFactory</code>'s <code>definition()</code>, exactly as <code>Book::factory()-&gt;create(['title' =&gt; 'Dune'])</code>
+worked in the last topic.</p>
+<h2>Wiring them together: <code>DatabaseSeeder</code></h2>
+<p><code>php artisan db:seed</code> only ever runs one class directly -
+<code>DatabaseSeeder</code> - so that's where the four seeders above actually get
+called, via <code>$this-&gt;call()</code>:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">call</span>([
+        <span class="hljs-title class_">UserSeeder</span>::<span class="hljs-variable language_">class</span>,
+        <span class="hljs-title class_">AuthorSeeder</span>::<span class="hljs-variable language_">class</span>,
+        <span class="hljs-title class_">BookSeeder</span>::<span class="hljs-variable language_">class</span>,
+        <span class="hljs-title class_">ReviewSeeder</span>::<span class="hljs-variable language_">class</span>,
+    ]);
+}
+</code></pre>
+<p><code>$this-&gt;call()</code> runs each listed seeder's <code>run()</code> method in the exact
+order given. <code>DatabaseSeeder</code> stays a short table of contents rather than
+a place where actual seeding logic lives - which also means this is the
+one seeder that keeps the <code>WithoutModelEvents</code> trait from the generated
+skeleton above: it applies to the whole batch, not to any one seeder
+individually.</p>
+<h2>Why that order isn't arbitrary</h2>
+<p>Swap two of those lines - say, run <code>BookSeeder</code> before <code>AuthorSeeder</code> -
+and seeding fails immediately:</p>
+<pre><code class="hljs">Database\Seeders\BookSeeder ........................................ RUNNING
+
+InvalidArgumentException
+
+You requested 1 items, but there are only 0 items available.
+
+at database/seeders/BookSeeder.php:26
+</code></pre>
+<p><code>BookSeeder</code> asks for <code>Author::all()</code> and then attaches a random one to
+every book. Run it before <code>AuthorSeeder</code>, and <code>Author::all()</code> comes back
+empty - there's nothing yet to pick a random one <em>from</em>. The rule this
+follows is the same one from designing the schema back in Lesson 1:
+<strong>strong entities before the weak entities that depend on them.</strong> Users
+and authors don't need anything else to exist first; books do (an
+author, to attach to); reviews depend on the most, needing both a book
+and a user already in place. Seed in that order - users, authors, books,
+reviews - and every later seeder finds exactly what it needs already
+sitting in the database.</p>
+<h2><code>BookSeeder</code>: attaching authors that already exist</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$authors</span> = <span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">all</span>();
+
+    <span class="hljs-variable">$books</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>(<span class="hljs-number">20</span>)-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-comment">// Most books have a single author.</span>
+    <span class="hljs-variable">$books</span>-&gt;<span class="hljs-title function_ invoke__">each</span>(function (Book <span class="hljs-variable">$book</span>) <span class="hljs-keyword">use</span> ($<span class="hljs-title">authors</span>) {
+        $<span class="hljs-title">book</span>-&gt;<span class="hljs-title">authors</span>()-&gt;<span class="hljs-title">attach</span>($<span class="hljs-title">authors</span>-&gt;<span class="hljs-title">random</span>());
+    });
+
+    <span class="hljs-comment">// A couple of books are co-written - attach a second, different</span>
+    <span class="hljs-comment">// author to two randomly chosen books.</span>
+    <span class="hljs-variable">$books</span>-&gt;<span class="hljs-title function_ invoke__">random</span>(<span class="hljs-number">2</span>)-&gt;<span class="hljs-title function_ invoke__">each</span>(function (Book <span class="hljs-variable">$book</span>) <span class="hljs-keyword">use</span> ($<span class="hljs-title">authors</span>) {
+        $<span class="hljs-title">firstAuthorId</span> = $<span class="hljs-title">book</span>-&gt;<span class="hljs-title">authors</span>-&gt;<span class="hljs-title">first</span>()-&gt;<span class="hljs-title">id</span>;
+
+        <span class="hljs-variable">$secondAuthor</span> = <span class="hljs-variable">$authors</span>
+            -&gt;<span class="hljs-title function_ invoke__">reject</span>(fn (Author <span class="hljs-variable">$author</span>) =&gt; <span class="hljs-variable">$author</span>-&gt;id === <span class="hljs-variable">$firstAuthorId</span>)
+            -&gt;<span class="hljs-title function_ invoke__">random</span>();
+
+        <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">authors</span>()-&gt;<span class="hljs-title function_ invoke__">attach</span>(<span class="hljs-variable">$secondAuthor</span>);
+    });
+}
+</code></pre>
+<p><code>$authors = Author::all()</code> only makes sense given the ordering rule
+above - it's the five rows <code>AuthorSeeder</code> already created. Twenty books
+get created first, unattached to anyone; then every book gets exactly
+one random existing author attached via <code>$book-&gt;authors()-&gt;attach()</code>,
+the same many-to-many method from the Eloquent relationships topic.
+Two books, chosen at random, get a <em>second</em> author attached afterwards -
+<code>reject()</code> filters that second pick down to authors who aren't already
+attached to this particular book, so a book can never end up &quot;co-written&quot;
+with itself.</p>
+<h2><code>ReviewSeeder</code>: working around the factory's own default</h2>
+<p>Last topic's <code>ReviewFactory</code> gives <code>book_id</code> and <code>user_id</code> a default
+worth revisiting here:</p>
+<pre><code class="hljs language-php"><span class="hljs-comment">// ReviewFactory.php</span>
+<span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>(),
+<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>(),
+</code></pre>
+<p>That default is exactly what makes <code>Review::factory()-&gt;create()</code> useful
+on its own in <code>tinker</code> - it always produces a complete row, inventing a
+book and a user to go with it if none are supplied. Inside a seeder,
+that's the opposite of helpful. Twenty books and five users already
+exist, created on purpose, in a specific quantity - a review seeder that
+let every review invent its <em>own</em> extra book and user would blow both
+those numbers open. It's easy to see happen:</p>
+<pre><code class="hljs">&gt; App\Models\Book::count(); App\Models\User::count();
+= 20
+= 5
+&gt; App\Models\Review::factory()-&gt;create();
+&gt; App\Models\Book::count(); App\Models\User::count();
+= 21
+= 6
+</code></pre>
+<p>One unguarded <code>Review::factory()-&gt;create()</code> call, and there's a 21st book
+and a 6th user that nobody asked for. <code>ReviewSeeder</code> avoids this by never
+calling <code>Review::factory()-&gt;create()</code> without overriding both foreign
+keys:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">run</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$users</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">all</span>();
+    <span class="hljs-variable">$books</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">all</span>();
+
+    <span class="hljs-variable">$reviewCounts</span> = [
+        <span class="hljs-number">0</span>, <span class="hljs-number">0</span>,
+        <span class="hljs-number">5</span>, <span class="hljs-number">5</span>, <span class="hljs-number">5</span>, <span class="hljs-number">5</span>,
+        <span class="hljs-number">4</span>, <span class="hljs-number">4</span>, <span class="hljs-number">4</span>, <span class="hljs-number">4</span>,
+        <span class="hljs-number">3</span>, <span class="hljs-number">3</span>, <span class="hljs-number">3</span>, <span class="hljs-number">3</span>,
+        <span class="hljs-number">2</span>, <span class="hljs-number">2</span>, <span class="hljs-number">2</span>, <span class="hljs-number">2</span>, <span class="hljs-number">2</span>, <span class="hljs-number">2</span>,
+    ];
+    <span class="hljs-title function_ invoke__">shuffle</span>(<span class="hljs-variable">$reviewCounts</span>);
+
+    <span class="hljs-variable">$books</span>-&gt;<span class="hljs-title function_ invoke__">each</span>(function (Book <span class="hljs-variable">$book</span>, <span class="hljs-keyword">int</span> <span class="hljs-variable">$index</span>) <span class="hljs-keyword">use</span> ($<span class="hljs-title">users</span>, $<span class="hljs-title">reviewCounts</span>) {
+        $<span class="hljs-title">reviewerCount</span> = $<span class="hljs-title">reviewCounts</span>[$<span class="hljs-title">index</span>];
+
+        <span class="hljs-keyword">if</span> (<span class="hljs-variable">$reviewerCount</span> === <span class="hljs-number">0</span>) {
+            <span class="hljs-keyword">return</span>;
+        }
+
+        <span class="hljs-variable">$users</span>-&gt;<span class="hljs-title function_ invoke__">random</span>(<span class="hljs-variable">$reviewerCount</span>)-&gt;<span class="hljs-title function_ invoke__">each</span>(function (User <span class="hljs-variable">$user</span>) <span class="hljs-keyword">use</span> ($<span class="hljs-title">book</span>) {
+            <span class="hljs-title">Review</span>::<span class="hljs-title">factory</span>()-&gt;<span class="hljs-title">create</span>([
+                &#x27;<span class="hljs-title">book_id</span>&#x27; =&gt; $<span class="hljs-title">book</span>-&gt;<span class="hljs-title">id</span>,
+                &#x27;<span class="hljs-title">user_id</span>&#x27; =&gt; $<span class="hljs-title">user</span>-&gt;<span class="hljs-title">id</span>,
+            ]);
+        });
+    });
+}
+</code></pre>
+<p>Passing <code>'book_id' =&gt; $book-&gt;id</code> and <code>'user_id' =&gt; $user-&gt;id</code> overrides
+the factory's defaults completely - <code>Book::factory()</code> and
+<code>User::factory()</code> never run, because the values they'd have filled in
+are already supplied. Only <code>rating</code> and <code>comment</code> still come from
+<code>ReviewFactory</code>'s own Faker calls.</p>
+<p>The rest of the method controls <em>how many</em> reviews land on each book.
+<code>$reviewCounts</code> is twenty numbers, one per book, that always add up to
+sixty and stay within 0-5; <code>shuffle()</code> means it isn't always the same two
+books that end up with none. For whichever count a given book gets,
+<code>$users-&gt;random($reviewerCount)</code> picks that many <em>different</em> users out of
+the five - never the same user twice for the same book, which matters
+because <code>reviews</code> has a unique index on <code>book_id</code> + <code>user_id</code> (from the
+migrations topic back in Lesson 1) that would reject a second review by
+the same user on the same book outright.</p>
+<h2>Running it</h2>
+<pre><code class="hljs">php artisan migrate:fresh --seed
+</code></pre>
+<p>drops every table, re-runs all the migrations, and then runs
+<code>DatabaseSeeder</code> - the command to reach for any time the schema or the
+seeders themselves have changed, and the one used throughout this topic.
+<code>php artisan db:seed</code> on its own re-runs just the seeding half, without
+touching the schema - which only works once. Run it a second time against
+data that's already there, and it fails the same way a form re-submitted
+twice would:</p>
+<pre><code class="hljs">Illuminate\Database\UniqueConstraintViolationException
+
+SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry
+&#x27;emma.watson84@example.com&#x27; for key &#x27;users.users_email_unique&#x27;
+</code></pre>
+<p><code>UserSeeder</code> tries to insert <code>emma.watson84@example.com</code> again, and the
+same unique constraint that stops two people registering with the same
+email stops the seeder too. While working on just one seeder, <code>db:seed --class=</code> targets a single one instead of the whole batch - handy for,
+say, tweaking <code>BookSeeder</code> without waiting on <code>UserSeeder</code> and
+<code>AuthorSeeder</code> to run again first:</p>
+<pre><code class="hljs">php artisan db:seed --class=BookSeeder
+</code></pre>
+<h2>Checking the result</h2>
+<pre><code class="hljs">$ php artisan tinker
+&gt; App\Models\User::count();
+= 5
+&gt; App\Models\Author::count();
+= 5
+&gt; App\Models\Book::count();
+= 20
+&gt; App\Models\Review::count();
+= 60
+&gt; App\Models\Book::has(&#x27;authors&#x27;, &#x27;&gt;=&#x27;, 2)-&gt;count();
+= 2
+&gt; App\Models\Book::doesntHave(&#x27;reviews&#x27;)-&gt;count();
+= 2
+</code></pre>
+<p>Five users, five authors, twenty books, sixty reviews, two co-written
+books, two books with no reviews yet - exactly the shape this topic set
+out to build, and all of it reproducible from nothing with one command.</p>
+<h2>What's still missing</h2>
+<p>The catalogue is real now, but there's still no way to actually browse
+it - no page lists the books, no page shows one book's authors and
+reviews. That's this lesson's next topic.</p>
+</div>
+    
+  </main>
+</body>
+</html>
