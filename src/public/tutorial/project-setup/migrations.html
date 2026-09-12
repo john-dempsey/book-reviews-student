@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Migrations: users, books, authors, author_book, reviews — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/project-setup/installing-laravel-and-breeze.html">← Installing Laravel and Breeze</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/project-setup/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/project-setup/eloquent-models-and-relationships.html">Eloquent models and relationships →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/project-setup/index.html">Lesson 1: Project Setup, Schema &amp; Authentication</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Migrations: users, books, authors, author_book, reviews</span>
+          
+        
+      </nav>
+    
+
+    <h1>Migrations: users, books, authors, author_book, reviews</h1>
+    <p class="lede">Creating and running the migrations for the full schema, one table at a time: naming, column/foreign-key syntax, and the migrate command&#39;s rollback mechanics.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The last topic's closing paragraph already told you what a migration
+is — a version-controlled PHP class describing one schema change, applied
+by <code>php artisan migrate</code> rather than hand-edited in phpMyAdmin. This topic
+puts that into practice for real: four new tables, <code>books</code>, <code>authors</code>,
+<code>author_book</code>, and <code>reviews</code>, each one kept as its own individually
+runnable, individually reversible step.</p>
+<h2>Naming: timestamps set the order</h2>
+<p>Every migration file starts with a full timestamp —
+<code>2026_09_12_065917_create_books_table.php</code> — because <code>php artisan migrate</code> runs pending migrations in <strong>filename order</strong>, and a timestamp
+sorts exactly the way it happened chronologically. That's also why the
+three default migrations you already have look the way they do:
+<code>0001_01_01_000000_create_users_table.php</code> and its two siblings use a
+deliberately tiny, made-up timestamp — year <code>0001</code> — guaranteeing they
+sort before literally any migration a real project ever generates, since
+<code>users</code> has to exist before anything that references it.</p>
+<p>You get a correctly-timestamped file for free by generating it rather
+than creating one by hand:</p>
+<pre><code class="hljs">php artisan make:migration create_books_table
+</code></pre>
+<p>This writes an empty stub straight into <code>database/migrations/</code>, timestamp
+already filled in, ready to edit:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Schema</span>::<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-string">&#x27;books&#x27;</span>, function (Blueprint <span class="hljs-variable">$table</span>) {
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">id</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">timestamps</span>();
+});
+</code></pre>
+<p>Running that same command three more times — for <code>create_authors_table</code>,
+<code>create_author_book_table</code>, and <code>create_reviews_table</code>, in that order —
+gives four stubs whose timestamps
+already reflect the order this schema needs: <code>author_book</code> references
+both <code>books</code> and <code>authors</code>, and <code>reviews</code> references <code>books</code> and <code>users</code>,
+so both have to come after the tables they point at.</p>
+<h2>Writing each table</h2>
+<h3><code>books</code></h3>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Schema</span>::<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-string">&#x27;books&#x27;</span>, function (Blueprint <span class="hljs-variable">$table</span>) {
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">id</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-keyword">string</span>(<span class="hljs-string">&#x27;title&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">text</span>(<span class="hljs-string">&#x27;description&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">year</span>(<span class="hljs-string">&#x27;year&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-keyword">string</span>(<span class="hljs-string">&#x27;image&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+
+    <span class="hljs-comment">// Part 1 keeps one implicit edition per book, rather than a</span>
+    <span class="hljs-comment">// separate editions table - these four fields describe that</span>
+    <span class="hljs-comment">// one edition directly.</span>
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-keyword">string</span>(<span class="hljs-string">&#x27;isbn&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-keyword">string</span>(<span class="hljs-string">&#x27;publisher&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-keyword">string</span>(<span class="hljs-string">&#x27;edition_number&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">decimal</span>(<span class="hljs-string">&#x27;price&#x27;</span>, <span class="hljs-number">8</span>, <span class="hljs-number">2</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">timestamps</span>();
+});
+</code></pre>
+<p>Most of this reads directly off your SQL knowledge: <code>string</code> is
+<code>VARCHAR(255)</code>, <code>text</code> is <code>TEXT</code>, <code>decimal(8, 2)</code> is exactly the SQL type
+of the same name. <code>year()</code> is one you might not have reached for by
+hand — MySQL has a dedicated <code>YEAR</code> type, and this is the column it's
+for. <code>$table-&gt;id()</code> is the one genuinely new piece: an auto-incrementing
+<code>BIGINT UNSIGNED</code> primary key named <code>id</code>, which is also the column every
+<code>foreignId()</code> below assumes it's pointing at.</p>
+<h3><code>authors</code></h3>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Schema</span>::<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-string">&#x27;authors&#x27;</span>, function (Blueprint <span class="hljs-variable">$table</span>) {
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">id</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-keyword">string</span>(<span class="hljs-string">&#x27;name&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-keyword">string</span>(<span class="hljs-string">&#x27;image&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">text</span>(<span class="hljs-string">&#x27;bio&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">timestamps</span>();
+});
+</code></pre>
+<p>No foreign keys yet — an <code>Author</code> doesn't belong to anything else. The
+relationship between books and authors lives in the next table instead.</p>
+<h3><code>author_book</code></h3>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Schema</span>::<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-string">&#x27;author_book&#x27;</span>, function (Blueprint <span class="hljs-variable">$table</span>) {
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">id</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">foreignId</span>(<span class="hljs-string">&#x27;book_id&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">constrained</span>()-&gt;<span class="hljs-title function_ invoke__">onDelete</span>(<span class="hljs-string">&#x27;cascade&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">foreignId</span>(<span class="hljs-string">&#x27;author_id&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">constrained</span>()-&gt;<span class="hljs-title function_ invoke__">onDelete</span>(<span class="hljs-string">&#x27;cascade&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">timestamps</span>();
+});
+</code></pre>
+<p>A Book can have many Authors, and an Author can have written many Books —
+a many-to-many relationship, which needs a table in between holding pairs
+of IDs. <code>author_book</code> is exactly that join table, named the way Laravel
+expects: the two related table names, singular, alphabetical, joined with
+an underscore. <code>$table-&gt;foreignId('book_id')</code> on its own just adds a
+<code>BIGINT UNSIGNED</code> column named <code>book_id</code>; <code>-&gt;constrained()</code> is what turns
+it into a real foreign key — it works out, from the column's own name,
+that <code>book_id</code> should reference <code>books.id</code>. Running <code>SHOW CREATE TABLE author_book</code> afterward shows exactly the constraint you'd expect to have
+written by hand:</p>
+<pre><code class="hljs language-sql"><span class="hljs-keyword">CONSTRAINT</span> `author_book_book_id_foreign` <span class="hljs-keyword">FOREIGN KEY</span> (`book_id`) <span class="hljs-keyword">REFERENCES</span> `books` (`id`) <span class="hljs-keyword">ON</span> <span class="hljs-keyword">DELETE</span> CASCADE,
+<span class="hljs-keyword">CONSTRAINT</span> `author_book_author_id_foreign` <span class="hljs-keyword">FOREIGN KEY</span> (`author_id`) <span class="hljs-keyword">REFERENCES</span> `authors` (`id`) <span class="hljs-keyword">ON</span> <span class="hljs-keyword">DELETE</span> CASCADE
+</code></pre>
+<p><code>-&gt;onDelete('cascade')</code> on both means deleting a Book or an Author also
+deletes the pairing rows that mentioned it — without it, that delete
+would simply fail with a foreign-key-constraint error instead, since a
+dangling <code>author_book</code> row referencing a Book that no longer exists isn't
+allowed.</p>
+<h3><code>reviews</code></h3>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Schema</span>::<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>, function (Blueprint <span class="hljs-variable">$table</span>) {
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">id</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">foreignId</span>(<span class="hljs-string">&#x27;book_id&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">constrained</span>()-&gt;<span class="hljs-title function_ invoke__">onDelete</span>(<span class="hljs-string">&#x27;cascade&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">foreignId</span>(<span class="hljs-string">&#x27;user_id&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">constrained</span>()-&gt;<span class="hljs-title function_ invoke__">onDelete</span>(<span class="hljs-string">&#x27;cascade&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">unsignedTinyInteger</span>(<span class="hljs-string">&#x27;rating&#x27;</span>);
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">text</span>(<span class="hljs-string">&#x27;comment&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">nullable</span>();
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">timestamps</span>();
+
+    <span class="hljs-comment">// At most one review per user per book - enforced here, not</span>
+    <span class="hljs-comment">// just in application code.</span>
+    <span class="hljs-variable">$table</span>-&gt;<span class="hljs-title function_ invoke__">unique</span>([<span class="hljs-string">&#x27;book_id&#x27;</span>, <span class="hljs-string">&#x27;user_id&#x27;</span>]);
+});
+</code></pre>
+<p><code>rating</code> only ever needs to hold 1–5, so <code>unsignedTinyInteger</code> — SQL's
+smallest integer type — is a better fit than a plain <code>integer</code>; nothing
+about the app changes if the column happens to be smaller than it needs
+to be, but it's worth picking the type that actually matches the data.
+The last line is doing real work: a <strong>unique composite index</strong> across
+two columns together, so the <em>pair</em> <code>(book_id, user_id)</code> can't repeat —
+one row per user for a given book is fine, and one row per book for a
+given user is fine, but the same user reviewing the same book twice would
+violate the index and fail at the database level, not just get caught by
+a validation rule that a bug could bypass.</p>
+<h2>Running the migrations</h2>
+<p><code>php artisan migrate</code> runs <strong>every migration that hasn't run yet</strong>, in
+filename order, and records each one in a <code>migrations</code> table of its own —
+that's how it knows, next time, which files are already applied and which
+are still pending. Run plain, all four new tables would go in one call:</p>
+<pre><code class="hljs">$ php artisan migrate
+
+   INFO  Running migrations.
+
+  2026_09_12_065917_create_books_table .......................... 60ms DONE
+  2026_09_12_065936_create_authors_table ........................ 56ms DONE
+  2026_09_12_065948_create_author_book_table ................... 531ms DONE
+  2026_09_12_070000_create_reviews_table ....................... 476ms DONE
+</code></pre>
+<p>Every migration that runs together in one call like this shares a
+<strong>batch</strong> number — which matters for rolling back, covered next. Adding
+<code>--step</code> changes that: each migration that runs gets recorded as its own
+batch, even several at once in a single command:</p>
+<pre><code class="hljs">$ php artisan migrate --step
+</code></pre>
+<p><code>php artisan migrate:status</code> shows the difference plainly. The three
+default migrations were all applied together at first-time setup, with
+no <code>--step</code> — batch <code>1</code>, all three. This lesson's four ran with
+<code>--step</code>, in one call, and still landed in batches <code>2</code> through <code>5</code>, one
+table each:</p>
+<pre><code class="hljs">$ php artisan migrate:status
+
+  Migration name .............................................. Batch / Status
+  0001_01_01_000000_create_users_table ............................... [1] Ran
+  0001_01_01_000001_create_cache_table ............................... [1] Ran
+  0001_01_01_000002_create_jobs_table ................................ [1] Ran
+  2026_09_12_065917_create_books_table ................................ [2] Ran
+  2026_09_12_065936_create_authors_table ............................... [3] Ran
+  2026_09_12_065948_create_author_book_table ........................... [4] Ran
+  2026_09_12_070000_create_reviews_table ................................ [5] Ran
+</code></pre>
+<h2>Undoing a migration</h2>
+<p>Every migration file has a <code>down()</code> method alongside <code>up()</code> — for
+<code>books</code>, that's just <code>Schema::dropIfExists('books')</code>. <code>php artisan migrate:rollback</code> uses it to undo migrations — by default, the <strong>most
+recent batch</strong>:</p>
+<pre><code class="hljs">$ php artisan migrate:rollback
+
+   INFO  Rolling back migrations.
+
+  2026_09_12_070000_create_reviews_table ......................... 96ms DONE
+</code></pre>
+<p>Because <code>reviews</code> was its own batch, this undoes exactly that one table.
+Without <code>--step</code> on the way in, several migrations sharing a batch would
+all roll back together here instead — not what you'd want if only the
+newest one actually needs undoing.</p>
+<p><code>migrate:rollback</code> takes its own <code>--step</code> too, and it means something
+more precise than &quot;batches&quot;: <code>--step=N</code> walks back the last <code>N</code>
+migrations individually, in reverse order, regardless of which batch each
+one landed in:</p>
+<pre><code class="hljs">$ php artisan migrate:rollback --step=2
+
+   INFO  Rolling back migrations.
+
+  2026_09_12_065948_create_author_book_table .................... 102ms DONE
+  2026_09_12_065936_create_authors_table ......................... 17ms DONE
+</code></pre>
+<p>That undoes <code>author_book</code> and <code>authors</code> — the two most recently run
+migrations — leaving <code>books</code> (and everything before it) untouched, batch
+number aside. Running <code>php artisan migrate</code> (with or without <code>--step</code>)
+again re-applies whatever's pending, in the same filename order as
+always.</p>
+<p>One more command worth knowing, mainly for your own local experimenting:
+<code>php artisan migrate:fresh</code> drops every table outright and re-runs every
+migration from scratch — a clean slate, useful when your local database
+has gotten into a state you'd rather just discard than debug. It's not
+something you'd run against data anyone cares about keeping.</p>
+<h2>One rule from here on</h2>
+<p>These four files are the schema for the rest of this course. Once a
+lesson is finished and tagged, its migrations are never edited again to
+fix a mistake — a correction becomes a <em>new</em> migration instead, the same
+way you'd never rewrite a query that already ran against production data.
+Nothing about this course has reached that point yet, but it's the reason
+migrations are written the way they are: each one a small, standalone,
+one-directional step, not a file you come back to and adjust.</p>
+</div>
+    
+  </main>
+</body>
+</html>

@@ -1,0 +1,203 @@
+:root {
+  color-scheme: light;
+  --column-width: 44rem;
+  --border: #ddd;
+  --text: #1a1a1a;
+  --muted: #666;
+  --accent: #0b5fff;
+  --bg-code: #f6f8fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* Sticky nav bar (TUTORIAL.md "Navigation model") — the band spans the full
+   viewport width so it reads as a fixed header while scrolling, but its
+   content is constrained to the same column width as the page body below. */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.site-nav-inner {
+  max-width: var(--column-width);
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+}
+
+.site-nav a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.site-nav a:hover {
+  text-decoration: underline;
+}
+
+.nav-slot {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.nav-slot-left {
+  justify-content: flex-start;
+}
+
+.nav-slot-center {
+  justify-content: center;
+}
+
+.nav-slot-right {
+  justify-content: flex-end;
+}
+
+.nav-prev,
+.nav-next {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-home {
+  color: var(--muted) !important;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.nav-home:hover {
+  color: var(--accent) !important;
+}
+
+/* Fixed-width, centered content column — TUTORIAL.md "Content hierarchy". */
+.content {
+  max-width: var(--column-width);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* Names the lesson a topic belongs to, since the sticky nav's "↑ Up" arrow
+   above only says "up", not what's up there — see TUTORIAL.md's
+   "Navigation model". */
+.breadcrumb {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.breadcrumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.breadcrumb-sep {
+  margin: 0 0.4em;
+}
+
+.content h1 {
+  margin-bottom: 0.25rem;
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 1.1rem;
+  margin-top: 0;
+}
+
+.listing {
+  list-style: none;
+  padding: 0;
+}
+
+.listing li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.listing li:last-child {
+  border-bottom: none;
+}
+
+.listing a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.listing a:hover {
+  text-decoration: underline;
+}
+
+.listing p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+.topic-body :is(h2, h3) {
+  margin-top: 2.5rem;
+}
+
+.topic-body pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-size: 0.9rem;
+}
+
+.topic-body :not(pre) > code {
+  background: var(--bg-code);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+
+.topic-body blockquote {
+  margin-left: 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.topic-body table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.topic-body th,
+.topic-body td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+/* Screenshots/diagrams (content/images/, see TUTORIAL.md "Build pipeline")
+   never exceed the fixed-width column, whatever their native size. */
+.topic-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
