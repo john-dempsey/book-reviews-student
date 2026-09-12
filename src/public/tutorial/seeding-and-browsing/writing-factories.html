@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Writing factories — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/project-setup/first-tests.html">← First tests: models</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/seeding-and-browsing/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/seeding-and-browsing/index.html">Lesson 2: Seeding &amp; Browsing the Catalogue</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Writing factories</span>
+          
+        
+      </nav>
+    
+
+    <h1>Writing factories</h1>
+    <p class="lede">One factory per model - AuthorFactory, BookFactory, ReviewFactory - and the HasFactory trait that turns each model into something that can conjure realistic-looking rows on demand.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Every row you've created so far has been typed out by hand. The model
+tests from the last topic built a <code>Book</code> like this:</p>
+<pre><code class="hljs language-php"><span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">create</span>([
+    <span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;The Pragmatic Programmer&#x27;</span>,
+    <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-number">1999</span>,
+]);
+</code></pre>
+<p>That's fine for proving a schema works - one or two rows, with values you
+chose because they made the test's point. It falls apart the moment you
+want twenty books that don't all look suspiciously identical, or just
+want <em>something</em> in the database to look at while building a page,
+without caring what its title actually is. A <strong>factory</strong> is a class that
+knows how to produce one plausible-looking row for a model, as many
+times as you ask for it.</p>
+<h2>Creating a factory</h2>
+<p><code>php artisan make:factory</code> generates the skeleton:</p>
+<pre><code class="hljs">php artisan make:factory AuthorFactory --model=Author
+</code></pre>
+<pre><code class="hljs language-php"><span class="hljs-meta">&lt;?php</span>
+
+<span class="hljs-keyword">namespace</span> <span class="hljs-title class_">Database</span>\<span class="hljs-title class_">Factories</span>;
+
+<span class="hljs-keyword">use</span> <span class="hljs-title">App</span>\<span class="hljs-title">Models</span>\<span class="hljs-title">Author</span>;
+<span class="hljs-keyword">use</span> <span class="hljs-title">Illuminate</span>\<span class="hljs-title">Database</span>\<span class="hljs-title">Eloquent</span>\<span class="hljs-title">Factories</span>\<span class="hljs-title">Factory</span>;
+
+<span class="hljs-comment">/**
+ * <span class="hljs-doctag">@extends</span> Factory&lt;Author&gt;
+ */</span>
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">AuthorFactory</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Factory</span>
+</span>{
+    <span class="hljs-comment">/**
+     * Define the model&#x27;s default state.
+     *
+     * <span class="hljs-doctag">@return</span> array&lt;string, mixed&gt;
+     */</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">definition</span>(<span class="hljs-params"></span>): <span class="hljs-title">array</span>
+    </span>{
+        <span class="hljs-keyword">return</span> [
+            <span class="hljs-comment">//</span>
+        ];
+    }
+}
+</code></pre>
+<p>An empty <code>definition()</code>, waiting to be filled in - the same shape as the
+<code>$fillable</code> array from the models topic, just generated into its own file
+in <code>database/factories/</code> rather than typed into the model class itself.
+The <code>@extends Factory&lt;Author&gt;</code> comment above the class isn't required by
+PHP - it's a type hint for your editor, so autocompletion knows that
+<code>AuthorFactory::new()</code> deals in <code>Author</code> objects rather than some generic
+model.</p>
+<p>One thing the generator doesn't do: wire the factory onto the model
+itself. <code>Author</code>, <code>Book</code>, and <code>Review</code> need a trait added before
+<code>Author::factory()</code> means anything -</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">use</span> <span class="hljs-title">Database</span>\<span class="hljs-title">Factories</span>\<span class="hljs-title">AuthorFactory</span>;
+<span class="hljs-keyword">use</span> <span class="hljs-title">Illuminate</span>\<span class="hljs-title">Database</span>\<span class="hljs-title">Eloquent</span>\<span class="hljs-title">Factories</span>\<span class="hljs-title">HasFactory</span>;
+<span class="hljs-keyword">use</span> <span class="hljs-title">Illuminate</span>\<span class="hljs-title">Database</span>\<span class="hljs-title">Eloquent</span>\<span class="hljs-title">Model</span>;
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Author</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Model</span>
+</span>{
+    <span class="hljs-comment">/** <span class="hljs-doctag">@use</span> HasFactory&lt;AuthorFactory&gt; */</span>
+    <span class="hljs-keyword">use</span> <span class="hljs-title">HasFactory</span>;
+
+    <span class="hljs-keyword">protected</span> <span class="hljs-variable">$fillable</span> = [
+        <span class="hljs-comment">// ...</span>
+    ];
+}
+</code></pre>
+<ul>
+<li>same opt-in instinct as <code>$fillable</code>: a model doesn't get factory support
+just for existing, it has to ask for it. <code>Book</code> and <code>Review</code> each get the
+same two lines, pointing at their own factory. <code>User</code> already had this -
+Breeze's install wired <code>HasFactory</code> onto it before this lesson touched
+anything.</li>
+</ul>
+<h2>Filling in the definition</h2>
+<p><code>definition()</code> returns an array of column-name =&gt; value, exactly like the
+arrays you've been passing to <code>Model::create()</code> - the difference is every
+value here comes from <strong>Faker</strong>, a library that generates realistic-looking
+random data, via the <code>fake()</code> helper. <code>AuthorFactory</code> is the simplest one:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">definition</span>(<span class="hljs-params"></span>): <span class="hljs-title">array</span>
+</span>{
+    <span class="hljs-keyword">return</span> [
+        <span class="hljs-string">&#x27;name&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">name</span>(),
+        <span class="hljs-string">&#x27;image&#x27;</span> =&gt; <span class="hljs-literal">null</span>,
+        <span class="hljs-string">&#x27;bio&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">paragraph</span>(),
+    ];
+}
+</code></pre>
+<p><code>fake()-&gt;name()</code> returns a plausible full name (a different one every
+call), <code>fake()-&gt;paragraph()</code> a plausible paragraph of prose. <code>image</code> is
+left <code>null</code> on purpose - nothing generates a real image file, and the
+column is nullable.</p>
+<p><code>BookFactory</code> leans on a few more of Faker's generators:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">definition</span>(<span class="hljs-params"></span>): <span class="hljs-title">array</span>
+</span>{
+    <span class="hljs-keyword">return</span> [
+        <span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">rtrim</span>(<span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">sentence</span>(<span class="hljs-title function_ invoke__">random_int</span>(<span class="hljs-number">2</span>, <span class="hljs-number">5</span>)), <span class="hljs-string">&#x27;.&#x27;</span>),
+        <span class="hljs-string">&#x27;description&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">paragraphs</span>(<span class="hljs-number">3</span>, <span class="hljs-literal">true</span>),
+        <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">numberBetween</span>(<span class="hljs-number">1950</span>, (<span class="hljs-keyword">int</span>) <span class="hljs-title function_ invoke__">date</span>(<span class="hljs-string">&#x27;Y&#x27;</span>)),
+        <span class="hljs-string">&#x27;image&#x27;</span> =&gt; <span class="hljs-literal">null</span>,
+        <span class="hljs-string">&#x27;isbn&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">isbn13</span>(),
+        <span class="hljs-string">&#x27;publisher&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">company</span>(),
+        <span class="hljs-string">&#x27;edition_number&#x27;</span> =&gt; (<span class="hljs-keyword">string</span>) <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">numberBetween</span>(<span class="hljs-number">1</span>, <span class="hljs-number">5</span>),
+        <span class="hljs-string">&#x27;price&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">randomFloat</span>(<span class="hljs-number">2</span>, <span class="hljs-number">9.99</span>, <span class="hljs-number">79.99</span>),
+    ];
+}
+</code></pre>
+<p>Worth pausing on a couple of these:</p>
+<ul>
+<li><code>fake()-&gt;sentence(2, 5)</code> produces a short sentence like <em>&quot;Voluptas et
+fugiat.&quot;</em> - it always ends in a full stop, which reads oddly as a book
+title, so <code>rtrim(..., '.')</code> strips it back off.</li>
+<li><code>year</code> is bounded between 1950 and <em>this actual year</em> (<code>date('Y')</code>,
+cast to an int) rather than a fixed upper limit that would quietly go
+stale - it always generates a plausible publication year, not a
+hardcoded one that ages badly.</li>
+<li><code>edition_number</code> is cast to a string with <code>(string)</code> because the column
+itself is a <code>string</code> in the migration (Part 1 keeps edition details as
+plain fields on <code>books</code>, rather than a separate editions table) -
+<code>numberBetween()</code> returns an <code>int</code>, and the factory's job is to match
+the column's actual type.</li>
+</ul>
+<h2>A factory that depends on other rows: <code>ReviewFactory</code></h2>
+<p>A review doesn't make sense floating on its own - it belongs to a book
+and was written by a user. <code>ReviewFactory</code> reflects that:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">definition</span>(<span class="hljs-params"></span>): <span class="hljs-title">array</span>
+</span>{
+    <span class="hljs-keyword">return</span> [
+        <span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>(),
+        <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>(),
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">numberBetween</span>(<span class="hljs-number">1</span>, <span class="hljs-number">5</span>),
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-keyword">boolean</span>(<span class="hljs-number">80</span>) ? <span class="hljs-title function_ invoke__">fake</span>()-&gt;<span class="hljs-title function_ invoke__">paragraph</span>() : <span class="hljs-literal">null</span>,
+    ];
+}
+</code></pre>
+<p><code>book_id</code> and <code>user_id</code> aren't Faker values - they're <strong>other factories</strong>,
+nested inside this one. Ask for <code>Review::factory()-&gt;create()</code> with nothing
+overridden, and Eloquent doesn't just leave those columns empty: it runs
+<code>Book::factory()</code> and <code>User::factory()</code> first, creates a brand new book
+and a brand new user to go with them, and only then creates the review
+pointing at both. That's a sensible default for a factory used on its
+own - it always produces a complete, valid row, never a review with a
+<code>book_id</code> pointing nowhere - even though it's rarely what you actually
+want once specific books and users already exist to attach reviews to
+instead.</p>
+<p><code>comment</code> shows a different kind of variation: <code>fake()-&gt;boolean(80)</code>
+returns <code>true</code> about 80% of the time, so most reviews get a written
+comment and some are left with just a star rating - <code>null</code>, since the
+column is nullable.</p>
+<h2>Using a factory</h2>
+<p>Every factory gives you the same handful of methods, regardless of which
+model it belongs to.</p>
+<p><strong><code>create()</code></strong> builds a model instance <em>and</em> saves it to the database
+straight away:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+</code></pre>
+<p><strong><code>count()</code></strong> (or the shorthand of passing a number straight to
+<code>factory()</code>) makes several at once:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">count</span>(<span class="hljs-number">3</span>)-&gt;<span class="hljs-title function_ invoke__">create</span>();
+<span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>(<span class="hljs-number">3</span>)-&gt;<span class="hljs-title function_ invoke__">create</span>();   <span class="hljs-comment">// same thing</span>
+</code></pre>
+<p><strong>Overriding attributes</strong> - pass an array to <code>create()</code>, same as
+<code>Model::create()</code>, and only those keys are pinned; everything else still
+comes from <code>definition()</code>:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+</code></pre>
+<p>Handy when a test cares about one specific value (a known title to search
+for, say) but doesn't care what the rest of the row looks like.</p>
+<p><strong><code>make()</code></strong> is <code>create()</code>'s quieter sibling - it builds the model object
+with the same fake attributes but never saves it, so nothing touches the
+database:</p>
+<pre><code class="hljs language-php"><span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">make</span>();   <span class="hljs-comment">// in memory only, not in `books`</span>
+</code></pre>
+<p>Rarely what you want for a book or author, since there's nothing to look
+at until it's actually saved - but worth knowing it exists, and that
+<code>create()</code> is really just <code>make()</code> plus a <code>save()</code> call, the same
+relationship your own Active-Record-style classes had between building an
+object and persisting it.</p>
+<h2>Trying it out with <code>tinker</code></h2>
+<pre><code class="hljs">$ php artisan tinker
+&gt; \App\Models\Author::factory()-&gt;create();
+= App\Models\Author {#7842
+    name: &quot;Dr. Providenci Wolf&quot;,
+    image: null,
+    bio: &quot;Quia rerum et dolores nam. Vitae nihil quod...&quot;,
+    id: 1,
+    updated_at: &quot;2026-09-15 10:03:41&quot;,
+    created_at: &quot;2026-09-15 10:03:41&quot;,
+  }
+&gt; \App\Models\Book::factory()-&gt;create([&#x27;title&#x27; =&gt; &#x27;Dune&#x27;]);
+= App\Models\Book {#7869
+    title: &quot;Dune&quot;,
+    description: &quot;Sunt magni ex nihil...&quot;,
+    year: 1998,
+    image: null,
+    isbn: &quot;978-1-4028-9462-6&quot;,
+    publisher: &quot;Kunde-Bahringer&quot;,
+    edition_number: &quot;3&quot;,
+    price: &quot;42.17&quot;,
+    id: 1,
+    updated_at: &quot;2026-09-15 10:04:02&quot;,
+    created_at: &quot;2026-09-15 10:04:02&quot;,
+  }
+&gt; \App\Models\Review::factory()-&gt;create();
+</code></pre>
+<p>Every value except <code>title</code> above is Faker's doing, and will be different
+every time you run it yourself - that last <code>Review::factory()-&gt;create()</code>
+is worth trying and then checking <code>books</code> and <code>users</code> in phpMyAdmin
+afterwards: a brand new book and a brand new user will have appeared,
+neither of which you asked for by name, exactly as the nested-factory
+behaviour above describes.</p>
+<h2>What's still missing</h2>
+<p>Every row created so far - in <code>tinker</code>, in last lesson's tests, and
+above - has existed one at a time, created because someone typed a
+command. Nothing yet produces a whole catalogue in one go: a fixed number
+of users and authors, books attached to the right authors, reviews
+attached to the right books and users, in the kind of quantity and shape
+a real (if fictional) book review site would actually have. That's the
+next topic's job.</p>
+</div>
+    
+  </main>
+</body>
+</html>
