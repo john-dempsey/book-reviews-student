@@ -64,14 +64,20 @@
             </div>
 
             <div class="bg-white overflow-hidden shadow-sm rounded-lg p-6">
-                <h3 class="font-semibold text-lg text-gray-900">
-                    {{ __('Reviews') }}
-                    @if ($book->reviews->isNotEmpty())
-                        <span class="text-gray-500 font-normal text-base">
-                            ({{ number_format($book->reviews->avg('rating'), 1) }} / 5 average, {{ $book->reviews->count() }} {{ Str::plural('review', $book->reviews->count()) }})
-                        </span>
-                    @endif
-                </h3>
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold text-lg text-gray-900">
+                        {{ __('Reviews') }}
+                        @if ($book->reviews->isNotEmpty())
+                            <span class="text-gray-500 font-normal text-base">
+                                ({{ number_format($book->reviews->avg('rating'), 1) }} / 5 average, {{ $book->reviews->count() }} {{ Str::plural('review', $book->reviews->count()) }})
+                            </span>
+                        @endif
+                    </h3>
+
+                    <a href="{{ route('books.reviews.create', $book) }}" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
+                        {{ __('Write a Review') }}
+                    </a>
+                </div>
 
                 <div class="mt-2">
                     @forelse ($book->reviews as $review)
