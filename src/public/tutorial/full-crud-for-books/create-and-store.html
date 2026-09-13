@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create and store — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/seeding-and-browsing/testing-the-read-only-routes.html">← Testing the read-only routes</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/full-crud-for-books/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/full-crud-for-books/index.html">Lesson 3: Full CRUD for Books</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Create and store</span>
+          
+        
+      </nav>
+    
+
+    <h1>Create and store</h1>
+    <p class="lede">BookController@create and @store - the first form this course writes by hand, @csrf, and route model binding run in reverse to redirect straight to the book that was just created.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The catalogue can be browsed now, but it can't be changed - every book in
+it arrived through a seeder, not through the app itself. This topic adds
+the first way to change that: a form for adding a book, and the
+controller code that saves what it submits. Editing, deleting, and
+actually checking that submitted values make sense are still to come -
+this topic only covers getting a new book from a form into the database
+at all.</p>
+<h2>Two more routes: <code>create</code> and <code>store</code></h2>
+<p><code>Route::resource()</code> and <code>-&gt;only()</code> are both already familiar from the
+last lesson - this is just the same line, with two more method names
+added to the list:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;books&#x27;</span>, <span class="hljs-title class_">BookController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;index&#x27;</span>, <span class="hljs-string">&#x27;show&#x27;</span>, <span class="hljs-string">&#x27;create&#x27;</span>, <span class="hljs-string">&#x27;store&#x27;</span>]);
+</code></pre>
+<p><code>create</code> registers <code>GET /books/create</code>, named <code>books.create</code> - a page
+showing a form. <code>store</code> registers <code>POST /books</code>, named <code>books.store</code> -
+where that form submits to. Both were always part of what
+<code>Route::resource()</code> offers; last topic's <code>-&gt;only()</code> just hadn't asked for
+them yet.</p>
+<h2><code>BookController@create</code>: showing the form</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">create</span>(<span class="hljs-params"></span>)
+</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;books.create&#x27;</span>);
+}
+</code></pre>
+<p>Nothing more to it than that - the interesting part is the view.</p>
+<h2>The form itself, and a directive that's new: <code>@csrf</code></h2>
+<p><code>books/create.blade.php</code> is a plain HTML form, styled with the same
+<code>x-input-label</code> and <code>x-text-input</code> components Breeze's own login and
+registration forms already use - a hand-written form gets the rest of the
+app's look for free, rather than needing its own styling invented from
+scratch:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.store&#x27;) }}&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;space-y-6&quot;</span>&gt;</span>
+    @csrf
+
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">x-input-label</span> <span class="hljs-attr">for</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">:value</span>=<span class="hljs-string">&quot;__(&#x27;Title&#x27;)&quot;</span> /&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">x-text-input</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;text&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mt-1 block w-full&quot;</span> <span class="hljs-attr">required</span> <span class="hljs-attr">autofocus</span> /&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+
+    <span class="hljs-comment">&lt;!-- description, year, isbn, publisher, edition_number, price follow the same shape --&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+</code></pre>
+<p><code>@csrf</code> is new: it renders a hidden input carrying a random token,
+regenerated per session. Every <code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code> request in
+this app passes through a piece of middleware that checks for a token
+matching the current session before letting the request anywhere near a
+controller - reject it otherwise. That stops <strong>cross-site request
+forgery</strong>: some other, unrelated site tricking your browser into
+submitting a form to <code>book-reviews</code> on your behalf, using the login
+session your browser is already holding. Without a token only this app's
+own pages can generate, that forged request has no way to prove it
+actually came from here. Every form in this app needs the one line -
+Breeze's forms already had it, just never explained until now.</p>
+<h2><code>BookController@store</code>: saving it</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">store</span>(<span class="hljs-params">Request <span class="hljs-variable">$request</span></span>)
+</span>{
+    <span class="hljs-comment">// No validation yet - $fillable already stops anything other than</span>
+    <span class="hljs-comment">// these columns being mass-assigned, but nothing yet checks that</span>
+    <span class="hljs-comment">// the values themselves make sense. That&#x27;s next topic&#x27;s job.</span>
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">all</span>());
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">redirect</span>()-&gt;<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>);
+}
+</code></pre>
+<p><code>$request-&gt;all()</code> is every field the form submitted, as an array -
+<code>Book::create()</code> accepts it directly because <code>$fillable</code> (from the
+models topic back in Lesson 1) already filters it down to just the
+columns <code>Book</code> actually declares safe to mass-assign. That guards
+against the wrong <em>keys</em> reaching the database - an attacker adding a
+hidden <code>is_admin</code> field to the form, say - but not against the wrong
+<em>values</em>: nothing here yet checks that <code>title</code> was actually filled in, or
+that <code>year</code> is a real year. That's a separate problem from mass
+assignment, and it's next topic's job.</p>
+<h3>From a URL to a model, and back again</h3>
+<p>Topic 2.3 introduced route model binding: <code>{book}</code> in a route pattern
+resolves straight to a <code>Book $book</code> parameter, because Laravel looks up
+whatever id is in the URL for you. <code>redirect()-&gt;route('books.show', $book)</code>
+runs that same relationship <strong>in reverse</strong>. <code>books.show</code>'s route pattern
+is <code>books/{book}</code> - <code>route()</code> needs something to fill that placeholder
+with, and handing it an actual <code>Book</code> instance, rather than a raw id,
+is enough: Laravel reads the model's own key (<code>id</code>, by default) and
+builds <code>/books/21</code> (or whatever id it turns out to be) automatically.</p>
+<p>That id is trustworthy immediately after <code>Book::create()</code> returns,
+without a second query to look it up - the very same line that runs the
+<code>INSERT</code> also fills in the auto-incrementing id MySQL just assigned,
+right there on the <code>$book</code> object handed back. One call creates the row
+<em>and</em> leaves you holding a model that already knows where to find it.</p>
+<h2>Trying it out</h2>
+<p><code>books/index.blade.php</code>'s header gets an &quot;Add Book&quot; link pointing at
+<code>route('books.create')</code>, so the new form is actually reachable without
+typing the URL by hand. Fill it in and submit, and the new book's own
+show page - <code>authors</code>, <code>reviews</code>, all of it - renders exactly like every
+seeded book, because it's now just another row in the same table.</p>
+<p>Leave <code>title</code> blank instead, and the database itself is the only thing
+standing in the way:</p>
+<pre><code class="hljs">SQLSTATE[23000]: Integrity constraint violation: 1048 Column &#x27;title&#x27; cannot be null
+</code></pre>
+<p>That's the <code>NOT NULL</code> constraint from <code>books</code>' own migration, back in
+Lesson 1, doing exactly what it was built to do - refusing to let a
+titleless row exist at all. It's also not something any real user should
+ever see: a raw database exception and a 500 error page, instead of a
+message next to the field that was actually the problem. Turning that
+into something worth showing a user is next topic's entire subject.</p>
+</div>
+    
+  </main>
+</body>
+</html>

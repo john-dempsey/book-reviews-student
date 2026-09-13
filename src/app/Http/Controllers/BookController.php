@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Book;
+use Illuminate\Http\Request;
 
 class BookController extends Controller
 {
@@ -36,5 +37,26 @@ class BookController extends Controller
         $book->load(['authors', 'reviews.user']);
 
         return view('books.show', compact('book'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        return view('books.create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        // No validation yet - $fillable already stops anything other than
+        // these columns being mass-assigned, but nothing yet checks that
+        // the values themselves make sense. That's next topic's job.
+        $book = Book::create($request->all());
+
+        return redirect()->route('books.show', $book);
     }
 }
