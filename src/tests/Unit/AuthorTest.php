@@ -28,4 +28,12 @@ class AuthorTest extends TestCase
         $this->assertCount(1, $author->books);
         $this->assertTrue($author->books->first()->is($book));
     }
+
+    public function test_the_factory_creates_a_valid_author(): void
+    {
+        $author = Author::factory()->create();
+
+        $this->assertDatabaseHas('authors', ['id' => $author->id]);
+        $this->assertNotEmpty($author->name);
+    }
 }

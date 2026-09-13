@@ -73,6 +73,14 @@ class ReviewTest extends TestCase
         Review::create(['book_id' => $book->id, 'user_id' => $user->id, 'rating' => 1]);
     }
 
+    public function test_the_factory_creates_a_review_with_a_rating_between_one_and_five(): void
+    {
+        $review = Review::factory()->create();
+
+        $this->assertGreaterThanOrEqual(1, $review->rating);
+        $this->assertLessThanOrEqual(5, $review->rating);
+    }
+
     private function makeBook(): Book
     {
         return Book::create(['title' => 'Test Book', 'year' => 2000]);
