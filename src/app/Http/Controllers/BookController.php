@@ -104,6 +104,26 @@ class BookController extends Controller
     }
 
     /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Book $book)
+    {
+        // The row and its cover image are two separate things to delete -
+        // removing one never automatically removes the other. Deleting the
+        // file first, while $book->image still holds its path, closes the
+        // gap update() left open: a replaced cover was already an orphaned
+        // file sitting in storage/app/public/books; a deleted book without
+        // this line would just create another one, permanently this time.
+        if ($book->image) {
+            Storage::disk('public')->delete($book->image);
+        }
+
+        $book->delete();
+
+        return redirect()->route('books.index');
+    }
+
+    /**
      * Validation rules shared by store() and update() - a book has to make
      * sense the same way whether it's being created or edited.
      */

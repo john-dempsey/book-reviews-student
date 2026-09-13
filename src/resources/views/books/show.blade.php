@@ -5,9 +5,18 @@
                 {{ $book->title }}
             </h2>
 
-            <a href="{{ route('books.edit', $book) }}" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
-                {{ __('Edit') }}
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('books.edit', $book) }}" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
+                    {{ __('Edit') }}
+                </a>
+
+                <form method="POST" action="{{ route('books.destroy', $book) }}"
+                      onsubmit="return confirm('{{ __('Delete this book? This cannot be undone.') }}');">
+                    @csrf
+                    @method('DELETE')
+                    <x-danger-button>{{ __('Delete') }}</x-danger-button>
+                </form>
+            </div>
         </div>
     </x-slot>
 

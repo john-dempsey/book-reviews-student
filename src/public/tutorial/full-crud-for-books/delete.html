@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delete — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/full-crud-for-books/edit-update-and-image-upload.html">← Edit, update, and image upload</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/full-crud-for-books/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/full-crud-for-books/index.html">Lesson 3: Full CRUD for Books</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Delete</span>
+          
+        
+      </nav>
+    
+
+    <h1>Delete</h1>
+    <p class="lede">BookController@destroy, a spoofed DELETE request behind a confirm() dialog, and closing the orphaned-file gap the last topic left open on purpose.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Create, read, update - the catalogue can do everything except take a book
+back out again. This is the shortest controller method in the whole
+resource, and the last piece full CRUD needs.</p>
+<h2>One more route</h2>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;books&#x27;</span>, <span class="hljs-title class_">BookController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;index&#x27;</span>, <span class="hljs-string">&#x27;show&#x27;</span>, <span class="hljs-string">&#x27;create&#x27;</span>, <span class="hljs-string">&#x27;store&#x27;</span>, <span class="hljs-string">&#x27;edit&#x27;</span>, <span class="hljs-string">&#x27;update&#x27;</span>, <span class="hljs-string">&#x27;destroy&#x27;</span>]);
+</code></pre>
+<p><code>destroy</code> registers a route that responds to <code>DELETE</code>, named
+<code>books.destroy</code> - the last of the seven actions <code>Route::resource()</code> can
+generate, and the last one this app asks for. Every method on
+<code>BookController</code> now corresponds to one.</p>
+<h2><code>BookController@destroy</code></h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">destroy</span>(<span class="hljs-params">Book <span class="hljs-variable">$book</span></span>)
+</span>{
+    <span class="hljs-comment">// The row and its cover image are two separate things to delete -</span>
+    <span class="hljs-comment">// removing one never automatically removes the other. Deleting the</span>
+    <span class="hljs-comment">// file first, while $book-&gt;image still holds its path, closes the</span>
+    <span class="hljs-comment">// gap update() left open: a replaced cover was already an orphaned</span>
+    <span class="hljs-comment">// file sitting in storage/app/public/books; a deleted book without</span>
+    <span class="hljs-comment">// this line would just create another one, permanently this time.</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-variable">$book</span>-&gt;image) {
+        <span class="hljs-title class_">Storage</span>::<span class="hljs-title function_ invoke__">disk</span>(<span class="hljs-string">&#x27;public&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">delete</span>(<span class="hljs-variable">$book</span>-&gt;image);
+    }
+
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">delete</span>();
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">redirect</span>()-&gt;<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>);
+}
+</code></pre>
+<p>Route model binding resolves <code>$book</code> the same way it does everywhere
+else in this controller. <code>$book-&gt;delete()</code> is the one line that actually
+matters - everything above it exists because deleting a <code>Book</code> row and
+deleting its cover image file are two unrelated operations against two
+different storage systems (MySQL, and the <code>public</code> disk), and removing
+one was never going to imply the other. Skip the <code>Storage::disk('public')-&gt;delete()</code>
+call, and the image file becomes exactly the same kind of orphan last
+topic's replaced-cover gap already left behind - just permanently this
+time, since nothing will ever reference that path again to make the
+waste visible. <code>if ($book-&gt;image)</code> guards against calling <code>delete()</code>
+with an empty path on a book that never had a cover in the first place.</p>
+<h2>A <code>DELETE</code> request, from a plain HTML button</h2>
+<p>The same problem <code>update()</code> had - browsers can't actually send a <code>PUT</code></p>
+<ul>
+<li>applies here too, solved the same way:</li>
+</ul>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.destroy&#x27;, $book) }}&quot;</span>
+      <span class="hljs-attr">onsubmit</span>=<span class="hljs-string">&quot;return confirm(&#x27;Delete this book? This cannot be undone.&#x27;);&quot;</span>&gt;</span>
+    @csrf
+    @method(&#x27;DELETE&#x27;)
+    <span class="hljs-tag">&lt;<span class="hljs-name">x-danger-button</span>&gt;</span>{{ __(&#x27;Delete&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">x-danger-button</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+</code></pre>
+<p><code>@method('DELETE')</code> is <code>@method('PUT')</code> from last topic, spoofing a
+different verb - same hidden input, same middleware reading it, same
+<code>POST</code> underneath. <code>onsubmit</code> is plain JavaScript event handling,
+already familiar - <code>confirm()</code> shows the browser's own yes/no dialog and
+returns <code>true</code> or <code>false</code>; returning <code>false</code> from <code>onsubmit</code> stops the
+form submitting at all. Cancel the dialog, and the request to
+<code>books.destroy</code> never leaves the browser - nothing server-side even
+knows a delete was attempted. It sits next to the &quot;Edit&quot; link already on
+<code>books/show.blade.php</code>'s header, styled with <code>x-danger-button</code> (red,
+rather than the neutral grey every other button in this app uses) - the
+one action here that can't be undone by editing the result afterward.</p>
+<h2>Trying it out</h2>
+<p>Open any book, click &quot;Delete,&quot; and confirm the dialog - the response
+redirects to the catalogue index, and the book is gone from it, its
+page, and the database, all in one request. Delete a book that has an
+uploaded cover, and its file disappears from
+<code>storage/app/public/books</code> too, not just the database row - checkable
+directly, since nothing else in the app would ever show that.</p>
+<p>Full CRUD is done: a book can be created, read, updated, and deleted,
+each step validated and each failure handled without a raw database
+error reaching the browser. What's still missing is proof, beyond
+clicking around by hand, that all four keep working together as the
+codebase keeps changing - that's next topic's job.</p>
+</div>
+    
+  </main>
+</body>
+</html>
