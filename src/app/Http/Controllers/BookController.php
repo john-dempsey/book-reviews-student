@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Book;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
@@ -36,5 +38,106 @@ class BookController extends Controller
         $book->load(['authors', 'reviews.user']);
 
         return view('books.show', compact('book'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        return view('books.create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        // $fillable already stops the wrong *keys* reaching the database;
+        // this is what stops the wrong *values* - the same job the hand-
+        // written validator class from the PHP module did, rule strings
+        // instead of hand-written checks. A failure redirects back with
+        // the errors and the submitted input attached automatically -
+        // nothing here has to do that by hand.
+        $validated = $request->validate($this->validationRules());
+
+        if ($request->hasFile('image')) {
+            // Store the upload on the 'public' disk, under storage/app/public/books
+            // rather than storage/app/private - files on this disk are the ones the
+            // storage:link symlink makes reachable over HTTP at all. putFile() picks
+            // a random filename for us and returns the path it saved to, which is
+            // what belongs in the column - never the uploaded file's own original name.
+            $validated['image'] = Storage::disk('public')->putFile('books', $request->file('image'));
+        }
+
+        $book = Book::create($validated);
+
+        return redirect()->route('books.show', $book);
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(Book $book)
+    {
+        return view('books.edit', compact('book'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, Book $book)
+    {
+        // Same rules as store() - a book still has to make sense the second
+        // time it's saved, not just the first. validationRules() below is
+        // what keeps that "same rules" true by construction rather than by
+        // remembering to copy a change into both methods.
+        $validated = $request->validate($this->validationRules());
+
+        if ($request->hasFile('image')) {
+            $validated['image'] = Storage::disk('public')->putFile('books', $request->file('image'));
+        }
+
+        $book->update($validated);
+
+        return redirect()->route('books.show', $book);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Book $book)
+    {
+        // The row and its cover image are two separate things to delete -
+        // removing one never automatically removes the other. Deleting the
+        // file first, while $book->image still holds its path, closes the
+        // gap update() left open: a replaced cover was already an orphaned
+        // file sitting in storage/app/public/books; a deleted book without
+        // this line would just create another one, permanently this time.
+        if ($book->image) {
+            Storage::disk('public')->delete($book->image);
+        }
+
+        $book->delete();
+
+        return redirect()->route('books.index');
+    }
+
+    /**
+     * Validation rules shared by store() and update() - a book has to make
+     * sense the same way whether it's being created or edited.
+     */
+    private function validationRules(): array
+    {
+        return [
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'year' => 'required|integer|digits:4',
+            'isbn' => 'nullable|string|max:255',
+            'publisher' => 'nullable|string|max:255',
+            'edition_number' => 'nullable|string|max:255',
+            'price' => 'nullable|numeric|min:0',
+            'image' => 'nullable|image|max:2048',
+        ];
     }
 }

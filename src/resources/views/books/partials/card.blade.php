@@ -1,5 +1,5 @@
 <div class="bg-white overflow-hidden shadow-sm rounded-lg flex flex-col">
-    <img src="{{ $book->image ?? asset('images/book-placeholder.png') }}"
+    <img src="{{ $book->image ? Storage::url($book->image) : asset('images/book-placeholder.png') }}"
          alt="Cover of {{ $book->title }}"
          class="w-full h-48 object-contain">
 
