@@ -27,6 +27,11 @@ Route::middleware('auth')->group(function () {
     // context of one - so the URL says so: /books/{book}/reviews/create,
     // /books/{book}/reviews.
     Route::resource('books.reviews', ReviewController::class)->only(['create', 'store']);
+
+    // Editing or deleting a review, by contrast, never needs its book in
+    // the URL - /reviews/{review} already identifies exactly one row, so
+    // this half of the same controller gets its own flat resource route.
+    Route::resource('reviews', ReviewController::class)->only(['edit', 'update', 'destroy']);
 });
 
 require __DIR__.'/auth.php';
