@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testing the read-only routes — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/seeding-and-browsing/reading-the-catalogue.html">← Reading the catalogue: index and show</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/seeding-and-browsing/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/seeding-and-browsing/index.html">Lesson 2: Seeding &amp; Browsing the Catalogue</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Testing the read-only routes</span>
+          
+        
+      </nav>
+    
+
+    <h1>Testing the read-only routes</h1>
+    <p class="lede">Proving the factories and seeder still behave as documented, then this project&#39;s first feature tests - real HTTP requests against books.index/show and authors.index/show, checking the response the way a browser actually would.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Every piece built this lesson - factories, a seeder, two controllers, a
+handful of Blade views - has only ever been checked by hand: a <code>tinker</code>
+session, or clicking around the browser after <code>migrate:fresh --seed</code>.
+Nothing yet fails loudly if a future change quietly breaks one of them.
+This topic closes that gap, the same way the last lesson's final topic
+did for the schema - and adds one genuinely new kind of test along the
+way.</p>
+<h2>Two more unit tests: proving the factories still work</h2>
+<p><code>BookTest</code>, <code>AuthorTest</code>, and <code>ReviewTest</code> already exist from last
+lesson - each gets one more method, in exactly the same style as the
+tests already there, just building its row through a factory instead of
+typing every attribute by hand:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_factory_creates_a_valid_book</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertDatabaseHas</span>(<span class="hljs-string">&#x27;books&#x27;</span>, [<span class="hljs-string">&#x27;id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id]);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertNotEmpty</span>(<span class="hljs-variable">$book</span>-&gt;title);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertGreaterThanOrEqual</span>(<span class="hljs-number">1950</span>, <span class="hljs-variable">$book</span>-&gt;year);
+}
+</code></pre>
+<p>Nothing here is a new testing idea - <code>assertDatabaseHas()</code> and plain
+PHPUnit assertions are both already familiar. What's worth checking is
+different: not &quot;does this exact value end up in the database&quot; (the
+factory's values are random), but &quot;is whatever the factory produced
+actually plausible&quot; - a real title, a year inside the range <code>BookFactory</code>
+promises. <code>ReviewTest</code> gets the same treatment for <code>rating</code>:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_factory_creates_a_review_with_a_rating_between_one_and_five</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertGreaterThanOrEqual</span>(<span class="hljs-number">1</span>, <span class="hljs-variable">$review</span>-&gt;rating);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertLessThanOrEqual</span>(<span class="hljs-number">5</span>, <span class="hljs-variable">$review</span>-&gt;rating);
+}
+</code></pre>
+<h2>Testing the seeder</h2>
+<p>Last topic's &quot;checking the result&quot; section ran a handful of <code>tinker</code>
+commands by hand after seeding - counting users, authors, books, reviews,
+and confirming the two co-written books and two unreviewed ones actually
+turned up. A test can run that exact check automatically:</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">DatabaseSeederTest</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">TestCase</span>
+</span>{
+    <span class="hljs-keyword">use</span> <span class="hljs-title">RefreshDatabase</span>;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_seeding_produces_the_expected_catalogue_shape</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+    </span>{
+        <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">seed</span>();
+
+        <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">5</span>, <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">count</span>());
+        <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">5</span>, <span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">count</span>());
+        <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">20</span>, <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">count</span>());
+        <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">60</span>, <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">count</span>());
+    }
+}
+</code></pre>
+<p><code>$this-&gt;seed()</code> is new - it runs <code>DatabaseSeeder</code> (and everything it
+calls) inside the test's own transaction, the same one-shot job
+<code>php artisan migrate:fresh --seed</code> does from the terminal, just repeatable
+as an assertion instead of something you eyeball once. Two more methods
+in the same class check the less obvious guarantees from last topic's
+fixed review-count array:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_seeding_produces_two_co_written_books</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">seed</span>();
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">2</span>, <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">has</span>(<span class="hljs-string">&#x27;authors&#x27;</span>, <span class="hljs-string">&#x27;&gt;=&#x27;</span>, <span class="hljs-number">2</span>)-&gt;<span class="hljs-title function_ invoke__">count</span>());
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_seeding_leaves_two_books_without_reviews</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">seed</span>();
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">2</span>, <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">doesntHave</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">count</span>());
+}
+</code></pre>
+<p>Both read directly as the same queries typed into <code>tinker</code> last topic -
+now checked on every test run, not just the one time someone happened to
+look.</p>
+<h2>Feature tests: testing the actual browsing experience</h2>
+<p>Every test so far - this lesson and last - has been a <strong>unit test</strong>:
+building rows and calling methods directly, no HTTP involved. <code>BookController</code>
+and <code>AuthorController</code> are the first code in this course worth a
+<strong>feature test</strong> instead - one that makes a real request against a route
+and checks the response, closer to how a browser would actually use the
+app.</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">BookTest</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">TestCase</span>
+</span>{
+    <span class="hljs-keyword">use</span> <span class="hljs-title">RefreshDatabase</span>;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_guests_are_redirected_to_login</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+    </span>{
+        <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>));
+
+        <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;login&#x27;</span>, <span class="hljs-attr">absolute</span>: <span class="hljs-literal">false</span>));
+    }
+}
+</code></pre>
+<p><code>$this-&gt;get()</code> sends a real <code>GET</code> request through the whole framework -
+routing, middleware, the controller, the view - and returns a
+<code>TestResponse</code> to make assertions against. <code>route('books.index')</code> builds
+the URL from the route's name, the same way a Blade view would, rather
+than hardcoding <code>/books</code>. Since <code>books.index</code> sits behind the <code>auth</code>
+middleware, an unauthenticated request never reaches <code>BookController</code> at
+all - it's redirected to <code>route('login')</code> first, and <code>assertRedirect()</code>
+checks exactly that.</p>
+<p><strong>Logged in, the index page actually shows a book:</strong></p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_index_page_lists_books</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;Dune&#x27;</span>);
+}
+</code></pre>
+<p><code>actingAs($user)</code> is what a login form and a session cookie do together
+in a real browser, collapsed into one call - every request made after it
+is authenticated as that user. <code>assertSee()</code> searches the actual rendered
+HTML for the given text; here, that a book titled &quot;Dune&quot; made it all the
+way from a factory call, through <code>BookController@index</code>, through
+<code>books/partials/card.blade.php</code>, into the response.</p>
+<p><strong>The show page displays what it's supposed to:</strong></p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_show_page_displays_a_books_authors_and_reviews</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">authors</span>()-&gt;<span class="hljs-title function_ invoke__">attach</span>(<span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;name&#x27;</span> =&gt; <span class="hljs-string">&#x27;Frank Herbert&#x27;</span>]));
+    <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([
+        <span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id,
+        <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;A genuine classic.&#x27;</span>,
+    ]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;Frank Herbert&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;A genuine classic.&#x27;</span>);
+}
+</code></pre>
+<p>This is the test this topic's title actually promises: proof that
+<code>books.show</code> really does display a book's authors and reviews, not just
+that it returns a 200. <code>route('books.show', $book)</code> passes the model
+straight in - the same route model binding from the last topic, now
+building a URL instead of resolving one.</p>
+<p><strong>A route that binds a model can also fail to find one:</strong></p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_nonexistent_book_returns_a_404</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-string">&#x27;/books/999&#x27;</span>);
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertNotFound</span>();
+}
+</code></pre>
+<p>Route model binding looks up a <code>Book</code> with id <code>999</code>, finds nothing, and
+Laravel turns that failed lookup into a 404 automatically - no code in
+<code>BookController@show</code> handles this case explicitly, because none needs
+to.</p>
+<p><code>tests/Feature/AuthorTest.php</code> mirrors all four of these exactly, one
+level of the domain down - the same guest redirect, an index page that
+lists a seeded author, a show page proving <code>authors.show</code> displays that
+author's books, and a 404 for an id that doesn't exist.</p>
+<h2>Running everything</h2>
+<pre><code class="hljs">Tests:    49 passed (105 assertions)
+</code></pre>
+<p>Every test written across this lesson - the new factory checks, the
+seeder test, and both feature test files - passes alongside everything
+carried over from Lesson 1, one combined suite proving the whole
+catalogue actually holds together: seeded correctly, and browsable by
+anyone logged in.</p>
+<h2>What's still missing</h2>
+<p>The catalogue can be browsed, and now provably so - but it still can't be
+changed. There's no way to add a book, fix a typo in one, or remove it
+once it's there. Lesson 3 picks up from here with the rest of
+<code>BookController</code> - <code>create</code>, <code>store</code>, <code>edit</code>, <code>update</code>, and <code>destroy</code>.</p>
+</div>
+    
+  </main>
+</body>
+</html>

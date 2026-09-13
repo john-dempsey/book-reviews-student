@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -12,14 +11,19 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Order matters: the strong entities (users, authors) are seeded
+     * first, since the weak entities that follow (books, then reviews)
+     * depend on rows already existing to attach to - a book needs an
+     * author, and a review needs both a book and a user.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            UserSeeder::class,
+            AuthorSeeder::class,
+            BookSeeder::class,
+            ReviewSeeder::class,
         ]);
     }
 }

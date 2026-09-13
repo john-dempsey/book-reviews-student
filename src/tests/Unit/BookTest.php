@@ -50,4 +50,13 @@ class BookTest extends TestCase
 
         $this->assertCount(1, $book->reviews);
     }
+
+    public function test_the_factory_creates_a_valid_book(): void
+    {
+        $book = Book::factory()->create();
+
+        $this->assertDatabaseHas('books', ['id' => $book->id]);
+        $this->assertNotEmpty($book->title);
+        $this->assertGreaterThanOrEqual(1950, $book->year);
+    }
 }
