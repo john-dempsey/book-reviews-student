@@ -7,6 +7,8 @@ use App\Models\Book;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BookTest extends TestCase
@@ -56,5 +58,113 @@ class BookTest extends TestCase
         $response = $this->actingAs($user)->get('/books/999');
 
         $response->assertNotFound();
+    }
+
+    public function test_a_book_can_be_created(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('books.store'), [
+            'title' => 'Project Hail Mary',
+            'year' => 2021,
+            'image' => UploadedFile::fake()->image('cover.jpg'),
+        ]);
+
+        $book = Book::firstWhere('title', 'Project Hail Mary');
+        $response->assertRedirect(route('books.show', $book));
+        $this->assertNotNull($book);
+        Storage::disk('public')->assertExists($book->image);
+    }
+
+    public function test_creating_a_book_without_a_title_fails_validation_and_repopulates_the_form(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->from(route('books.create'))
+            ->post(route('books.store'), [
+                'title' => '',
+                'year' => 2021,
+            ]);
+
+        $response->assertRedirect(route('books.create'));
+        $response->assertSessionHasErrors('title');
+        $response->assertSessionHasInput('year', 2021);
+        $this->assertDatabaseMissing('books', ['year' => 2021]);
+    }
+
+    public function test_a_book_can_be_updated(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Old Title']);
+
+        $response = $this->actingAs($user)->put(route('books.update', $book), [
+            'title' => 'New Title',
+            'year' => $book->year,
+        ]);
+
+        $response->assertRedirect(route('books.show', $book));
+        $this->assertSame('New Title', $book->fresh()->title);
+    }
+
+    public function test_updating_a_book_without_a_title_fails_validation_and_leaves_it_unchanged(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Dune']);
+
+        $response = $this->actingAs($user)->put(route('books.update', $book), [
+            'title' => '',
+            'year' => $book->year,
+        ]);
+
+        $response->assertSessionHasErrors('title');
+        $this->assertSame('Dune', $book->fresh()->title);
+    }
+
+    public function test_a_book_can_be_deleted(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+
+        $response = $this->actingAs($user)->delete(route('books.destroy', $book));
+
+        $response->assertRedirect(route('books.index'));
+        $this->assertModelMissing($book);
+    }
+
+    public function test_deleting_a_book_removes_its_cover_image_from_storage(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $path = UploadedFile::fake()->image('cover.jpg')->store('books', 'public');
+        $book = Book::factory()->create(['image' => $path]);
+
+        $this->actingAs($user)->delete(route('books.destroy', $book));
+
+        Storage::disk('public')->assertMissing($path);
+    }
+
+    public function test_the_full_create_edit_delete_flow(): void
+    {
+        $user = User::factory()->create();
+
+        $createResponse = $this->actingAs($user)->post(route('books.store'), [
+            'title' => 'The Fellowship of the Ring',
+            'year' => 1954,
+        ]);
+        $book = Book::firstWhere('title', 'The Fellowship of the Ring');
+        $createResponse->assertRedirect(route('books.show', $book));
+
+        $editResponse = $this->actingAs($user)->put(route('books.update', $book), [
+            'title' => 'The Fellowship of the Ring (Revised)',
+            'year' => 1954,
+        ]);
+        $editResponse->assertRedirect(route('books.show', $book));
+        $this->assertSame('The Fellowship of the Ring (Revised)', $book->fresh()->title);
+
+        $deleteResponse = $this->actingAs($user)->delete(route('books.destroy', $book));
+        $deleteResponse->assertRedirect(route('books.index'));
+        $this->assertModelMissing($book);
     }
 }
