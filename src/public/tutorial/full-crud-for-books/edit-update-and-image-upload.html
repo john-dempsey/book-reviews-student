@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Edit, update, and image upload — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/full-crud-for-books/validation-and-form-repopulation.html">← Validation and form repopulation</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/full-crud-for-books/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/full-crud-for-books/index.html">Lesson 3: Full CRUD for Books</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Edit, update, and image upload</span>
+          
+        
+      </nav>
+    
+
+    <h1>Edit, update, and image upload</h1>
+    <p class="lede">edit/update mirror create/store almost exactly - the interesting new ground is a form shared between the two pages, and a cover image saved to Laravel&#39;s public disk.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Books can be added now, correctly validated. They still can't be
+changed once they exist - fixing a typo in a title, or giving a book an
+actual cover image instead of the placeholder, both mean going nowhere
+near the app. This topic adds both.</p>
+<h2>Two more routes, and a routing wrinkle worth naming</h2>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;books&#x27;</span>, <span class="hljs-title class_">BookController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;index&#x27;</span>, <span class="hljs-string">&#x27;show&#x27;</span>, <span class="hljs-string">&#x27;create&#x27;</span>, <span class="hljs-string">&#x27;store&#x27;</span>, <span class="hljs-string">&#x27;edit&#x27;</span>, <span class="hljs-string">&#x27;update&#x27;</span>]);
+</code></pre>
+<p><code>edit</code> registers <code>GET /books/{book}/edit</code>, named <code>books.edit</code> - a form,
+same shape as <code>create</code>'s. <code>update</code> registers a route that responds to
+<code>PUT</code> (and <code>PATCH</code>), named <code>books.update</code> - where that form submits to.</p>
+<p>Browsers can only ever send <code>GET</code> or <code>POST</code> from an HTML <code>&lt;form&gt;</code> -
+there's no <code>method=&quot;PUT&quot;</code> a browser will actually honour. Laravel's
+answer is <code>@method('PUT')</code>: a hidden input, rendered inside the form,
+that Laravel's own routing middleware reads and treats as if the request
+had actually arrived as a <code>PUT</code>. The request is a <code>POST</code> at the network
+level the whole time - <code>@method</code> is a polite fiction the framework
+maintains consistently on both ends, not a real HTTP verb change.</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">edit</span>(<span class="hljs-params">Book <span class="hljs-variable">$book</span></span>)
+</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;books.edit&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;book&#x27;</span>));
+}
+</code></pre>
+<p>Route model binding does the same job here it always has - <code>{book}</code> in
+the URL resolves straight to the <code>$book</code> parameter, no lookup written by
+hand.</p>
+<h2>One form, two pages</h2>
+<p><code>create.blade.php</code> and <code>edit.blade.php</code> were about to become the same
+form twice over, save for the URL it posts to and one hidden
+<code>@method('PUT')</code> - copy-pasting it would mean every future change to a
+field (a new one added, a validation message reworded) has to happen in
+two places and stay in sync by hand. <code>books/partials/form.blade.php</code>
+exists so it doesn't have to: every input, label, and <code>x-input-error</code>
+lives there once, and each page includes it.</p>
+<pre><code class="hljs language-html">{{-- create.blade.php --}}
+<span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.store&#x27;) }}&quot;</span> <span class="hljs-attr">enctype</span>=<span class="hljs-string">&quot;multipart/form-data&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;space-y-6&quot;</span>&gt;</span>
+    @csrf
+
+    @include(&#x27;books.partials.form&#x27;)
+<span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+</code></pre>
+<pre><code class="hljs language-html">{{-- edit.blade.php --}}
+<span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.update&#x27;, $book) }}&quot;</span> <span class="hljs-attr">enctype</span>=<span class="hljs-string">&quot;multipart/form-data&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;space-y-6&quot;</span>&gt;</span>
+    @csrf
+    @method(&#x27;PUT&#x27;)
+
+    @include(&#x27;books.partials.form&#x27;, [&#x27;book&#x27; =&gt; $book])
+<span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+</code></pre>
+<p><code>create.blade.php</code> never has a <code>$book</code> at all; <code>edit.blade.php</code> passes
+one in explicitly. The partial itself has to work either way - that's
+what <code>old('title', $book-&gt;title ?? '')</code> is for:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">x-text-input</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;text&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mt-1 block w-full&quot;</span>
+              <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{ old(&#x27;title&#x27;, $book-&gt;title ?? &#x27;&#x27;) }}&quot;</span> <span class="hljs-attr">required</span> <span class="hljs-attr">autofocus</span> /&gt;</span>
+</code></pre>
+<p><code>old()</code>'s second argument is the value to fall back to when nothing's
+flashed to the session under that key - which is every time except
+right after a failed validation on <em>this exact page</em>. On <code>create</code>,
+there's no <code>$book</code>, so the fallback is <code>''</code> - an empty field, same as
+before this topic. On <code>edit</code>, the fallback is <code>$book-&gt;title</code> - the
+book's actual saved value, so the form opens pre-filled with what's
+already there instead of a wall of blank inputs. Either way, a failed
+submission still repopulates whatever was actually typed, exactly as it
+did on the create-only form last topic - <code>old()</code> always wins when
+there's something flashed, regardless of which page it's on.</p>
+<p>This is the same <code>old()</code>/error-repopulation idea from last topic, doing
+double duty across two pages instead of one - the direct
+framework-provided version of writing that fallback logic by hand twice,
+once per page, the way the PHP module's own form-repopulation functions
+would have had to.</p>
+<h2><code>BookController@update</code></h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">update</span>(<span class="hljs-params">Request <span class="hljs-variable">$request</span>, Book <span class="hljs-variable">$book</span></span>)
+</span>{
+    <span class="hljs-comment">// Same rules as store() - a book still has to make sense the second</span>
+    <span class="hljs-comment">// time it&#x27;s saved, not just the first. validationRules() below is</span>
+    <span class="hljs-comment">// what keeps that &quot;same rules&quot; true by construction rather than by</span>
+    <span class="hljs-comment">// remembering to copy a change into both methods.</span>
+    <span class="hljs-variable">$validated</span> = <span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">validate</span>(<span class="hljs-variable">$this</span>-&gt;<span class="hljs-title function_ invoke__">validationRules</span>());
+
+    <span class="hljs-keyword">if</span> (<span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">hasFile</span>(<span class="hljs-string">&#x27;image&#x27;</span>)) {
+        <span class="hljs-variable">$validated</span>[<span class="hljs-string">&#x27;image&#x27;</span>] = <span class="hljs-title class_">Storage</span>::<span class="hljs-title function_ invoke__">disk</span>(<span class="hljs-string">&#x27;public&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">putFile</span>(<span class="hljs-string">&#x27;books&#x27;</span>, <span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">file</span>(<span class="hljs-string">&#x27;image&#x27;</span>));
+    }
+
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">update</span>(<span class="hljs-variable">$validated</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">redirect</span>()-&gt;<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>);
+}
+</code></pre>
+<p>Route model binding hands <code>update()</code> an already-loaded <code>$book</code>, the same
+way <code>show()</code> and <code>edit()</code> get theirs - no separate lookup. <code>$book-&gt;update($validated)</code>
+is the same <code>$fillable</code>-guarded mass assignment <code>Book::create()</code> used in
+<code>store()</code>, just against an existing row instead of a new one.</p>
+<p><code>store()</code> and <code>update()</code> need exactly the same rules - a book has to
+make sense the same way whichever one saves it - so the rule array
+itself moved out to its own method, called from both:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">private</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">validationRules</span>(<span class="hljs-params"></span>): <span class="hljs-title">array</span>
+</span>{
+    <span class="hljs-keyword">return</span> [
+        <span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;required|string|max:255&#x27;</span>,
+        <span class="hljs-string">&#x27;description&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string&#x27;</span>,
+        <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-string">&#x27;required|integer|digits:4&#x27;</span>,
+        <span class="hljs-string">&#x27;isbn&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string|max:255&#x27;</span>,
+        <span class="hljs-string">&#x27;publisher&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string|max:255&#x27;</span>,
+        <span class="hljs-string">&#x27;edition_number&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string|max:255&#x27;</span>,
+        <span class="hljs-string">&#x27;price&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|numeric|min:0&#x27;</span>,
+        <span class="hljs-string">&#x27;image&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|image|max:2048&#x27;</span>,
+    ];
+}
+</code></pre>
+<p><code>store()</code>'s own call becomes <code>$request-&gt;validate($this-&gt;validationRules())</code></p>
+<ul>
+<li>still the same inline <code>validate()</code> call this app has used since the
+last topic, just handed an array built by a private helper instead of
+typed out in place a second time. Adding a rule, or changing one, now
+only ever happens in one place, and <code>store()</code> and <code>update()</code> can't
+quietly drift apart from each other by someone editing one and
+forgetting the other.</li>
+</ul>
+<h2>Cover images: the <code>public</code> disk</h2>
+<p><code>image</code> gets its own validation rule - <code>nullable|image|max:2048</code> - the
+first rule this app has needed that isn't checking a plain string or
+number. <code>image</code> rejects anything that isn't actually a real image file
+(not just a filename that looks like one); <code>max:2048</code> caps it at 2048
+KB. Uploaded files also need the form itself to cooperate:
+<code>enctype=&quot;multipart/form-data&quot;</code> on the <code>&lt;form&gt;</code> tag is what tells the
+browser to actually attach the file's bytes to the request - without it,
+only the filename would arrive, and <code>$request-&gt;hasFile('image')</code> would
+never be true no matter what was selected.</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">if</span> (<span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">hasFile</span>(<span class="hljs-string">&#x27;image&#x27;</span>)) {
+    <span class="hljs-variable">$validated</span>[<span class="hljs-string">&#x27;image&#x27;</span>] = <span class="hljs-title class_">Storage</span>::<span class="hljs-title function_ invoke__">disk</span>(<span class="hljs-string">&#x27;public&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">putFile</span>(<span class="hljs-string">&#x27;books&#x27;</span>, <span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">file</span>(<span class="hljs-string">&#x27;image&#x27;</span>));
+}
+</code></pre>
+<p><code>Storage::disk('public')</code> is Laravel's storage abstraction pointed at
+one specific place to keep files: <code>storage/app/public</code> on disk - not
+<code>public/</code> directly, and not the <em>default</em> disk this app otherwise uses
+(that stays <code>local</code>, unrelated to this). <code>putFile('books', ...)</code> saves
+the upload under a <code>books/</code> subfolder there, picks a random filename
+itself (never trust a user-supplied one), and returns the path it chose</p>
+<ul>
+<li><code>books/a1b2c3d4....jpg</code> - which is what gets saved to the <code>image</code>
+column. Wrapping the whole thing in <code>hasFile()</code> matters: editing a book
+without touching the file input at all must leave its existing cover
+alone, not overwrite it with nothing.</li>
+</ul>
+<p><code>storage/app/public</code> isn't inside <code>public/</code> - the one folder Apache
+actually serves - so nothing in it is reachable by a browser yet. One
+command fixes that, run once per environment:</p>
+<pre><code class="hljs">php artisan storage:link
+</code></pre>
+<p>This creates <code>public/storage</code> as a symlink pointing at
+<code>storage/app/public</code> - the same folder, reachable two ways. Everything
+already saved there becomes servable immediately, with no code change
+and nothing to move.</p>
+<h2>Rendering it: <code>Storage::url()</code></h2>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">img</span> <span class="hljs-attr">src</span>=<span class="hljs-string">&quot;{{ $book-&gt;image ? Storage::url($book-&gt;image) : asset(&#x27;images/book-placeholder.png&#x27;) }}&quot;</span>
+     <span class="hljs-attr">alt</span>=<span class="hljs-string">&quot;Cover of {{ $book-&gt;title }}&quot;</span> <span class="hljs-attr">...</span>&gt;</span>
+</code></pre>
+<p><code>$book-&gt;image</code> only ever holds the <em>path</em> <code>putFile()</code> returned -
+<code>books/a1b2c3d4....jpg</code> - not something a browser can load directly.
+<code>Storage::url()</code> turns that stored path into the actual <code>/storage/...</code>
+URL the symlink makes servable, the one canonical way this app turns a
+stored path back into something an <code>&lt;img&gt;</code> tag can use - both the book's
+own show page and its card on the catalogue index use it the same way,
+falling back to the same placeholder used before any book had a real
+cover.</p>
+<h2>Trying it out</h2>
+<p><code>books/show.blade.php</code>'s header gets an &quot;Edit&quot; button next to the
+title, alongside the &quot;Add Book&quot; link the index page already had -
+following it opens <code>edit.blade.php</code>, pre-filled with the book's current
+values via the fallback in the shared partial. Change the title, upload
+an image, save - the show page reflects both immediately, and the
+catalogue's grid view shows the same new cover instead of the
+placeholder. Leave the title blank instead, and the same
+<code>old()</code>/<code>x-input-error</code> handling from last topic kicks in here too - a
+message under the field, every other value (and the file that's already
+attached) still there to fix and resubmit, exactly as it would on
+<code>create</code>.</p>
+<p>One honest gap: uploading a new cover over an existing one doesn't
+delete the old file from <code>storage/app/public/books</code> - the column just
+points at the new one, and the old one sits there unused. Real
+applications usually clean that up explicitly; this app doesn't yet,
+because nothing has run long enough for the orphaned files to matter.
+Deleting a book entirely - and what that should mean for its cover
+image - is next topic's subject.</p>
+</div>
+    
+  </main>
+</body>
+</html>

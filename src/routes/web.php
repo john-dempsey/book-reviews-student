@@ -18,9 +18,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Browsing and adding to the catalogue - edit/update/destroy are still
-    // to come, later in Lesson 3.
-    Route::resource('books', BookController::class)->only(['index', 'show', 'create', 'store']);
+    // Browsing, adding, and editing the catalogue - destroy is still to
+    // come, later in Lesson 3.
+    Route::resource('books', BookController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update']);
     Route::resource('authors', AuthorController::class)->only(['index', 'show']);
 });
 
