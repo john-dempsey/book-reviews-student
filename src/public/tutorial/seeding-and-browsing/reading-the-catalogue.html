@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reading the catalogue: index and show — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/seeding-and-browsing/seeders-and-demo-data.html">← Seeders and demo data</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/seeding-and-browsing/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/seeding-and-browsing/index.html">Lesson 2: Seeding &amp; Browsing the Catalogue</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Reading the catalogue: index and show</span>
+          
+        
+      </nav>
+    
+
+    <h1>Reading the catalogue: index and show</h1>
+    <p class="lede">BookController and AuthorController&#39;s read-only index/show actions, wired to real routes with route model binding - then the Blade layout, partials, and loops that turn seeded rows into an actual catalogue you can click through.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The catalogue built last topic is real, but it only exists in the
+database - no page lists the books, no page shows one book's authors and
+reviews. Getting from a seeded table to something you can click through
+touches every layer of the app at once: a <strong>route</strong> to match the URL, a
+<strong>controller</strong> to fetch the right rows, and a <strong>Blade view</strong> to turn them
+into HTML. This topic builds all three, for two resources at once -
+<code>Book</code> and <code>Author</code>.</p>
+<h2>Routing to a controller</h2>
+<p>Every route so far in this app has been either a closure
+(<code>Route::get('/', function () { ... })</code>) or one of Breeze's own
+already-generated auth routes. <code>BookController</code> and <code>AuthorController</code> are
+the first controllers <em>this course</em> writes, so they need routes of their
+own.</p>
+<p>A resource - in the CRUD sense - conventionally needs up to seven routes:
+list them all (<code>index</code>), show a form to create one (<code>create</code>), handle that
+form's submission (<code>store</code>), show one (<code>show</code>), show a form to edit one
+(<code>edit</code>), handle that form's submission (<code>update</code>), and delete one
+(<code>destroy</code>). Rather than writing seven <code>Route::get</code>/<code>Route::post</code>/...
+lines by hand, <code>Route::resource()</code> registers all seven in one line, wired
+to seven conventionally-named controller methods:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;books&#x27;</span>, <span class="hljs-title class_">BookController</span>::<span class="hljs-variable language_">class</span>);
+</code></pre>
+<p><code>BookController</code> doesn't have all seven methods yet - only <code>index</code> and
+<code>show</code> exist so far; creating, editing, and deleting a book properly
+(with validation) is a later lesson's job. <code>-&gt;only()</code> restricts the
+generated routes to just the ones that actually exist right now:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;books&#x27;</span>, <span class="hljs-title class_">BookController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;index&#x27;</span>, <span class="hljs-string">&#x27;show&#x27;</span>]);
+<span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;authors&#x27;</span>, <span class="hljs-title class_">AuthorController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;index&#x27;</span>, <span class="hljs-string">&#x27;show&#x27;</span>]);
+</code></pre>
+<p>That one line each registers:</p>
+<pre><code class="hljs">GET|HEAD   books ............ books.index › BookController@index
+GET|HEAD   books/{book} ..... books.show › BookController@show
+</code></pre>
+<p>(<code>php artisan route:list --path=books</code> prints exactly that.) The names on
+the left - <code>books.index</code>, <code>books.show</code> - are what <code>route('books.show', $book)</code>
+in a Blade view refers to; naming a route rather than writing <code>/books/1</code>
+directly means the actual URL can change later without breaking every
+link to it.</p>
+<h3><code>{book}</code> and route model binding</h3>
+<p><code>books/{book}</code> looks like it hands <code>BookController@show</code> a raw id - but
+the method signature is:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">show</span>(<span class="hljs-params">Book <span class="hljs-variable">$book</span></span>)
+</span>{
+    <span class="hljs-comment">// ...</span>
+}
+</code></pre>
+<p>Laravel matches the <code>{book}</code> segment in the route to the <code>$book</code>
+parameter's name, looks up that id, and injects the actual <code>Book</code> model -
+no <code>Book::findOrFail($id)</code> needed. Visit <code>/books/999</code> for an id that
+doesn't exist, and Laravel returns a 404 before <code>show()</code> even runs. This
+is <strong>route model binding</strong>, and it's why every method below takes a model
+instance directly instead of an id.</p>
+<h3>Still behind the login wall</h3>
+<p>Both resource routes are registered inside the same
+<code>Route::middleware('auth')-&gt;group()</code> that already protects <code>/profile</code> -
+browsing the catalogue needs a logged-in user too, the same as everything
+else in this app past the welcome page. Nothing about <code>index</code>/<code>show</code>
+themselves requires that; it's a deliberate consistency choice for this
+app, not a limitation of resource routes in general.</p>
+<h2>The first controllers you've written yourself</h2>
+<p>Breeze generated <code>Auth/AuthenticatedSessionController</code> and
+<code>ProfileController</code> when it installed authentication - useful, but you
+never had to write a line of either. <code>BookController</code> and
+<code>AuthorController</code> are the first controllers in this course you create
+and fill in, the same way:</p>
+<pre><code class="hljs">php artisan make:controller BookController
+</code></pre>
+<p>That generates an empty class extending the same <code>Controller</code> base every
+Breeze controller already extends. Nothing forces the method names inside
+it - but <code>Route::resource()</code> above only works because <code>index</code> and <code>show</code>
+are named exactly what a resource controller is expected to call them.</p>
+<h3><code>BookController@index</code>: listing, with <code>paginate()</code></h3>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">index</span>(<span class="hljs-params"></span>)
+</span>{
+    <span class="hljs-variable">$books</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">with</span>(<span class="hljs-string">&#x27;authors&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">withCount</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">withAvg</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>, <span class="hljs-string">&#x27;rating&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">orderBy</span>(<span class="hljs-string">&#x27;title&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">paginate</span>(<span class="hljs-number">12</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;books&#x27;</span>));
+}
+</code></pre>
+<p><code>paginate(12)</code> is new: instead of one collection holding every book,
+it returns 12 at a time and gives the view everything it needs to render
+&quot;next page&quot;/&quot;previous page&quot; links, reading the current page straight from
+the URL's own <code>?page=</code> query string. <code>get()</code> or <code>all()</code> would run too, but
+would hand the view every seeded book on one page.</p>
+<p><code>with('authors')</code> loads every matching book's authors in one extra query,
+up front. The alternative - letting each book load its own <code>$book-&gt;authors</code>
+the first time a Blade view actually touches it - is the classic <strong>N+1
+problem</strong>: one query for the books, then one more <em>per book</em> just to find
+out who wrote it. Twelve books on a page would mean thirteen queries
+instead of two. <code>withCount('reviews')</code> and <code>withAvg('reviews', 'rating')</code>
+solve the same problem for numbers the view needs but not the rows behind
+them: each adds one extra column (<code>reviews_count</code>, <code>reviews_avg_rating</code>)
+to the <em>same</em> query, computed by the database, instead of loading every
+review just to call <code>-&gt;count()</code> or <code>-&gt;avg('rating')</code> in PHP.</p>
+<h3><code>BookController@show</code>: <code>load()</code> instead of <code>with()</code></h3>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">show</span>(<span class="hljs-params">Book <span class="hljs-variable">$book</span></span>)
+</span>{
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">load</span>([<span class="hljs-string">&#x27;authors&#x27;</span>, <span class="hljs-string">&#x27;reviews.user&#x27;</span>]);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;book&#x27;</span>));
+}
+</code></pre>
+<p>Route model binding has already fetched <code>$book</code> by the time <code>show()</code>
+runs, so there's no query left to attach <code>with()</code> to - <code>load()</code> is the
+equivalent for a model that already exists, adding relationships to it
+after the fact. <code>'reviews.user'</code> is dot notation for a <strong>nested</strong>
+relationship: load every review, and for each of those, load the user who
+wrote it - one query for the reviews, one more for all their users at
+once, still not one query per review.</p>
+<h3><code>AuthorController</code>: the same shape, one level down</h3>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">index</span>(<span class="hljs-params"></span>)
+</span>{
+    <span class="hljs-variable">$authors</span> = <span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">withCount</span>(<span class="hljs-string">&#x27;books&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">orderBy</span>(<span class="hljs-string">&#x27;name&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">paginate</span>(<span class="hljs-number">12</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;authors.index&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;authors&#x27;</span>));
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">show</span>(<span class="hljs-params">Author <span class="hljs-variable">$author</span></span>)
+</span>{
+    <span class="hljs-variable">$author</span>-&gt;<span class="hljs-title function_ invoke__">load</span>([<span class="hljs-string">&#x27;books&#x27;</span> =&gt; function (<span class="hljs-variable">$query</span>) {
+        <span class="hljs-variable">$query</span>-&gt;<span class="hljs-title function_ invoke__">with</span>(<span class="hljs-string">&#x27;authors&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">withCount</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">withAvg</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>, <span class="hljs-string">&#x27;rating&#x27;</span>);
+    }]);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;authors.show&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;author&#x27;</span>));
+}
+</code></pre>
+<p><code>show()</code>'s books need their <em>own</em> authors, review count, and average
+rating loaded too - because the author's page reuses the exact same book
+card partial the <code>/books</code> listing uses (more on that below). Passing a
+closure to <code>load()</code> adds <code>with()</code>/<code>withCount()</code>/<code>withAvg()</code> constraints
+onto a relationship as it's loaded, rather than just naming it.</p>
+<h2>From <code>&lt;x-app-layout&gt;</code> to one card</h2>
+<p>Every page so far - <code>dashboard.blade.php</code>, the auth screens - starts the
+same way:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">x-app-layout</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">x-slot</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;header&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">h2</span>&gt;</span>...<span class="hljs-tag">&lt;/<span class="hljs-name">h2</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">x-slot</span>&gt;</span>
+
+    <span class="hljs-comment">&lt;!-- page content --&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">x-app-layout</span>&gt;</span>
+</code></pre>
+<p><code>&lt;x-app-layout&gt;</code> is a <strong>Blade component</strong> - a reusable chunk of markup
+invoked like an HTML tag. It isn't a Blade file directly; it's
+<code>App\View\Components\AppLayout</code>, a small PHP class whose only job is to
+say which view actually renders:</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">AppLayout</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Component</span>
+</span>{
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">render</span>(<span class="hljs-params"></span>): <span class="hljs-title">View</span>
+    </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;layouts.app&#x27;</span>);
+    }
+}
+</code></pre>
+<p><code>resources/views/layouts/app.blade.php</code> is that view - the shared HTML
+document (<code>&lt;html&gt;</code>, <code>&lt;head&gt;</code>, Tailwind's <code>@vite</code> tags, <code>&lt;body&gt;</code>) every page
+in the app renders inside of. Two things make it reusable rather than one
+static page: <code>{{ $slot }}</code>, where whatever sits <em>between</em> the
+<code>&lt;x-app-layout&gt;</code> tags ends up; and the <em>named</em> <code>&lt;x-slot name=&quot;header&quot;&gt;</code>,
+for the one part (the page title bar) that isn't just &quot;everything inside
+the tags&quot; - <code>@isset($header)</code> in the layout means a page that never
+defines one just doesn't get that bar at all.</p>
+<p><code>layouts/app.blade.php</code> also does <code>@include('layouts.navigation')</code>. That's
+a <strong>partial</strong> - a plain Blade file included as-is wherever <code>@include</code> is
+written, sharing whatever variables are already in scope. Unlike a
+component, a partial has no class of its own, no slots, and no declared
+list of what it expects - closer to the file's contents being pasted in
+place. <code>layouts/navigation.blade.php</code> is where the new &quot;Books&quot; and
+&quot;Authors&quot; links actually live, each using
+<code>request()-&gt;routeIs('books.*')</code> to decide whether it should render as the
+active one - true for <code>books.index</code> and <code>books.show</code> alike, since <code>*</code>
+matches anything after <code>books.</code>.</p>
+<h3>One index page, start to finish</h3>
+<p><code>authors/index.blade.php</code> uses almost everything above in one page:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">x-app-layout</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">x-slot</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;header&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">h2</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;...&quot;</span>&gt;</span>{{ __(&#x27;Authors&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">h2</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">x-slot</span>&gt;</span>
+
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;grid grid-cols-1 sm:grid-cols-2 gap-6&quot;</span>&gt;</span>
+        @forelse ($authors as $author)
+            @include(&#x27;authors.partials.card&#x27;, [&#x27;author&#x27; =&gt; $author])
+        @empty
+            <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-gray-600 col-span-full&quot;</span>&gt;</span>No authors in the catalogue yet.<span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+        @endforelse
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+
+    {{ $authors-&gt;links() }}
+<span class="hljs-tag">&lt;/<span class="hljs-name">x-app-layout</span>&gt;</span>
+</code></pre>
+<p><code>@forelse ... @empty ... @endforelse</code> is <code>@foreach</code> with a built-in &quot;what
+if the collection is empty&quot; branch, in one directive instead of a
+<code>@foreach</code> wrapped in an <code>@if ($authors-&gt;count())</code>. <code>@include('authors.partials.card', [...])</code>
+renders <code>authors/partials/card.blade.php</code> once per author, passing that
+one author in as <code>$author</code> - the same <code>@include</code> mechanism as the
+navigation partial above, just called once per loop iteration instead of
+once per page. <code>{{ $authors-&gt;links() }}</code> is what <code>paginate()</code> in the
+controller was for - Laravel's own default pagination view, rendering the
+actual &quot;1 2 3 ... Next&quot; links.</p>
+<h3>A partial reused across two different pages</h3>
+<p><code>books/partials/card.blade.php</code> isn't only used by <code>/books</code>:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;bg-white overflow-hidden shadow-sm rounded-lg flex flex-col&quot;</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">img</span> <span class="hljs-attr">src</span>=<span class="hljs-string">&quot;{{ $book-&gt;image ?? asset(&#x27;images/book-placeholder.png&#x27;) }}&quot;</span>
+         <span class="hljs-attr">alt</span>=<span class="hljs-string">&quot;Cover of {{ $book-&gt;title }}&quot;</span>
+         <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;w-full h-48 object-contain&quot;</span>&gt;</span>
+
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;p-4 flex flex-col grow&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">h3</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;font-semibold text-lg text-gray-900&quot;</span>&gt;</span>
+            <span class="hljs-tag">&lt;<span class="hljs-name">a</span> <span class="hljs-attr">href</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.show&#x27;, $book) }}&quot;</span>&gt;</span>{{ $book-&gt;title }}<span class="hljs-tag">&lt;/<span class="hljs-name">a</span>&gt;</span>
+        <span class="hljs-tag">&lt;/<span class="hljs-name">h3</span>&gt;</span>
+
+        <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-sm text-gray-600 mt-1&quot;</span>&gt;</span>
+            {{ $book-&gt;authors-&gt;pluck(&#x27;name&#x27;)-&gt;join(&#x27;, &#x27;) ?: &#x27;Unknown author&#x27; }}
+            <span class="hljs-symbol">&amp;middot;</span> {{ $book-&gt;year }}
+        <span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+
+        <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-sm text-gray-500 mt-auto pt-2&quot;</span>&gt;</span>
+            @if ($book-&gt;reviews_count &gt; 0)
+                {{ number_format($book-&gt;reviews_avg_rating, 1) }} / 5
+                ({{ $book-&gt;reviews_count }} {{ Str::plural(&#x27;review&#x27;, $book-&gt;reviews_count) }})
+            @else
+                No reviews yet
+            @endif
+        <span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+</code></pre>
+<p><code>authors/show.blade.php</code> loops over an author's own books through this
+exact same partial:</p>
+<pre><code class="hljs language-html">@forelse ($author-&gt;books as $book)
+    @include(&#x27;books.partials.card&#x27;, [&#x27;book&#x27; =&gt; $book])
+@empty
+    <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-gray-600 col-span-full&quot;</span>&gt;</span>No books by this author yet.<span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+@endforelse
+</code></pre>
+<p>One partial, two different pages - which is exactly why
+<code>AuthorController@show</code> bothers loading each book's own authors and
+review stats above: the partial expects the same shape of <code>$book</code>
+regardless of which page included it. <code>$book-&gt;authors-&gt;pluck('name')-&gt;join(', ')</code>
+turns the loaded <code>authors</code> collection into <code>&quot;Name One, Name Two&quot;</code> in one
+line; <code>Str::plural('review', $book-&gt;reviews_count)</code> is a small helper that
+returns <code>&quot;review&quot;</code> or <code>&quot;reviews&quot;</code> depending on the count it's given,
+rather than a <code>@if ($count === 1)</code> for one word.</p>
+<h3>Displaying a book's reviews</h3>
+<p><code>books/show.blade.php</code> loops over <code>$book-&gt;reviews</code> the same way, through
+its own partial:</p>
+<pre><code class="hljs language-html">@forelse ($book-&gt;reviews as $review)
+    @include(&#x27;reviews.partials.review&#x27;, [&#x27;review&#x27; =&gt; $review])
+@empty
+    <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-gray-600&quot;</span>&gt;</span>No reviews yet.<span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+@endforelse
+</code></pre>
+<p><code>reviews/partials/review.blade.php</code> itself is small - a reviewer's name,
+their rating, an optional comment, and the date:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;border-b border-gray-200 py-4 last:border-b-0&quot;</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;flex items-center justify-between&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;font-medium text-gray-900&quot;</span>&gt;</span>{{ $review-&gt;user-&gt;name }}<span class="hljs-tag">&lt;/<span class="hljs-name">span</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-sm text-gray-500&quot;</span>&gt;</span>{{ $review-&gt;rating }} / 5<span class="hljs-tag">&lt;/<span class="hljs-name">span</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+
+    @if ($review-&gt;comment)
+        <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-gray-700 mt-1&quot;</span>&gt;</span>{{ $review-&gt;comment }}<span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+    @endif
+
+    <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-xs text-gray-400 mt-1&quot;</span>&gt;</span>{{ $review-&gt;created_at-&gt;format(&#x27;d M Y&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+</code></pre>
+<p><code>@if ($review-&gt;comment)</code> matters because <code>comment</code> is nullable - some
+reviews are just a star rating. <code>$review-&gt;user-&gt;name</code> only avoids a
+second query per review because <code>BookController@show</code> already loaded
+<code>'reviews.user'</code> above - without that, this one line would be the N+1
+problem happening in the view instead of the controller.</p>
+<h2>Placeholder images</h2>
+<p>Book covers and author photos are both nullable columns, and nothing
+populates them yet - <code>BookFactory</code> and <code>AuthorFactory</code> leave <code>image</code> as
+<code>null</code> on purpose. Uploading a real image is a later lesson's job, once a
+form exists to attach a file to a book at all; for now, every card and
+show page falls back to a static placeholder instead of a broken image:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">img</span> <span class="hljs-attr">src</span>=<span class="hljs-string">&quot;{{ $book-&gt;image ?? asset(&#x27;images/book-placeholder.png&#x27;) }}&quot;</span> <span class="hljs-attr">...</span>&gt;</span>
+</code></pre>
+<p>The two placeholder graphics live at <code>public/images/book-placeholder.png</code>
+and <code>public/images/author-placeholder.png</code> - <code>public/</code> is the same folder
+the first lesson pointed out as &quot;anything Apache serves directly,&quot; the
+same reason <code>favicon.ico</code> or this tutorial site itself work without going
+through a route at all. <code>asset()</code> builds the full URL to a file under
+<code>public/</code> (<code>http://.../images/book-placeholder.png</code>), the same way
+<code>route()</code> builds a URL from a route's name rather than a raw path.</p>
+<h2>What's still missing</h2>
+<p>Every book and author can be browsed now, but only by someone already
+logged in, and only ever read - there's still no way to add a book, edit
+one, or leave a review. Proving these new routes actually work, with real
+tests instead of clicking through the browser by hand, is next.</p>
+</div>
+    
+  </main>
+</body>
+</html>
