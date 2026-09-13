@@ -58,6 +58,11 @@
             <p>A flat reviews/{review} route alongside the nested one, a shared form partial, and the manual abort(403) ownership check guarding edit, update, and destroy alike - a deliberate stand-in for the Policy class Part 2 introduces.</p>
           </li>
         
+          <li>
+            <a href="/tutorial/reviews/my-reviews.html">My reviews</a>
+            <p>A /my-reviews page listing everything the logged-in user has written, across every book - a plain route rather than a resource action, auth()-&gt;user()-&gt;reviews() reused the same way books.index already reuses withCount/withAvg, and latest() as a small new shorthand.</p>
+          </li>
+        
       </ul>
     
 

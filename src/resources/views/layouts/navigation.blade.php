@@ -21,6 +21,9 @@
                     <x-nav-link :href="route('authors.index')" :active="request()->routeIs('authors.*')">
                         {{ __('Authors') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('reviews.mine')" :active="request()->routeIs('reviews.mine')">
+                        {{ __('My Reviews') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -81,6 +84,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('authors.index')" :active="request()->routeIs('authors.*')">
                 {{ __('Authors') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('reviews.mine')" :active="request()->routeIs('reviews.mine')">
+                {{ __('My Reviews') }}
             </x-responsive-nav-link>
         </div>
 

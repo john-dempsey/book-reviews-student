@@ -9,6 +9,20 @@ use Illuminate\Http\Request;
 class ReviewController extends Controller
 {
     /**
+     * List the logged-in user's own reviews, across every book, most
+     * recent first.
+     */
+    public function mine()
+    {
+        $reviews = auth()->user()->reviews()
+            ->with('book')
+            ->latest()
+            ->paginate(12);
+
+        return view('reviews.mine', compact('reviews'));
+    }
+
+    /**
      * Show the form for leaving a review on the given book.
      */
     public function create(Book $book)

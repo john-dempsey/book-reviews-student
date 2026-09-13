@@ -32,6 +32,12 @@ Route::middleware('auth')->group(function () {
     // the URL - /reviews/{review} already identifies exactly one row, so
     // this half of the same controller gets its own flat resource route.
     Route::resource('reviews', ReviewController::class)->only(['edit', 'update', 'destroy']);
+
+    // Not one of the seven resource actions - a review is always scoped to
+    // a book (books.reviews.*) or, here, to the logged-in user, never
+    // listed globally, so this gets its own plain route rather than a
+    // resource index that doesn't fit either shape.
+    Route::get('/my-reviews', [ReviewController::class, 'mine'])->name('reviews.mine');
 });
 
 require __DIR__.'/auth.php';
