@@ -52,10 +52,23 @@ class BookController extends Controller
      */
     public function store(Request $request)
     {
-        // No validation yet - $fillable already stops anything other than
-        // these columns being mass-assigned, but nothing yet checks that
-        // the values themselves make sense. That's next topic's job.
-        $book = Book::create($request->all());
+        // $fillable already stops the wrong *keys* reaching the database;
+        // this is what stops the wrong *values* - the same job the hand-
+        // written validator class from the PHP module did, rule strings
+        // instead of hand-written checks. A failure redirects back with
+        // the errors and the submitted input attached automatically -
+        // nothing here has to do that by hand.
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'year' => 'required|integer|digits:4',
+            'isbn' => 'nullable|string|max:255',
+            'publisher' => 'nullable|string|max:255',
+            'edition_number' => 'nullable|string|max:255',
+            'price' => 'nullable|numeric|min:0',
+        ]);
+
+        $book = Book::create($validated);
 
         return redirect()->route('books.show', $book);
     }

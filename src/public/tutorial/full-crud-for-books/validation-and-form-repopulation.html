@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Validation and form repopulation — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/full-crud-for-books/create-and-store.html">← Create and store</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/full-crud-for-books/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/full-crud-for-books/index.html">Lesson 3: Full CRUD for Books</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Validation and form repopulation</span>
+          
+        
+      </nav>
+    
+
+    <h1>Validation and form repopulation</h1>
+    <p class="lede">$request-&gt;validate() replaces the hand-written validator class and manual PRG flow from the PHP module - rule strings, automatic redirect-back-with-errors on failure, and old()/@error in Blade.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Last topic ended on a raw database error: leave <code>title</code> blank, submit the
+form, and MySQL's own <code>NOT NULL</code> constraint is the only thing that
+noticed. That's not something any real user should ever see. This topic
+fixes it - and it's the closest this course gets to &quot;you've already built
+this,&quot; because it has already been built once, by hand, in the PHP
+module.</p>
+<h2>The same job, done there already</h2>
+<p>That prior module had a hand-written validator class, and a PRG
+(Post-Redirect-Get) flow built around it: check the submitted values,
+and if any failed, redirect back to the form instead of rendering a
+result page directly, carrying the error messages and the values already
+typed in along with it - so the user lands back on a form that still
+has their input, with a message next to whatever was wrong. Laravel's
+validation does exactly that job. The mechanism is different - a
+rule-string array instead of a hand-written check - but the goal, and
+the redirect-back-with-everything-attached shape of it, is the same
+thing already built once.</p>
+<h2><code>$request-&gt;validate()</code></h2>
+<pre><code class="hljs language-php"><span class="hljs-variable">$validated</span> = <span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">validate</span>([
+    <span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;required|string|max:255&#x27;</span>,
+    <span class="hljs-string">&#x27;description&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string&#x27;</span>,
+    <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-string">&#x27;required|integer|digits:4&#x27;</span>,
+    <span class="hljs-string">&#x27;isbn&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string|max:255&#x27;</span>,
+    <span class="hljs-string">&#x27;publisher&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string|max:255&#x27;</span>,
+    <span class="hljs-string">&#x27;edition_number&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string|max:255&#x27;</span>,
+    <span class="hljs-string">&#x27;price&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|numeric|min:0&#x27;</span>,
+]);
+</code></pre>
+<p>Each key is a field name from the form; each value is a list of rules,
+separated by <code>|</code>. <code>required</code> rejects a missing or blank value;
+<code>nullable</code> says the opposite - blank is fine, but if something <em>is</em>
+there, the rules after it still apply; <code>max:255</code> and <code>digits:4</code> bound
+length; <code>integer</code>/<code>numeric</code> reject non-numbers. There's no loop, no
+<code>if</code>, no hand-written message string anywhere in this method - the rule
+strings <em>are</em> the validator.</p>
+<p>When every rule passes, <code>validate()</code> returns the validated data as an
+array - <code>$validated</code> here - and the method carries on to the next line,
+exactly as before. <code>Book::create($validated)</code> replaces last topic's
+<code>Book::create($request-&gt;all())</code>: <code>$fillable</code> was already filtering the
+keys down to safe columns, and now <code>$validated</code> filters the <em>values</em> too,
+so both problems - the wrong keys reaching the database, and the wrong
+values - are covered before the <code>INSERT</code> ever runs.</p>
+<h2>When a rule fails</h2>
+<p>When any rule fails, <code>validate()</code> never returns at all. It throws an
+exception, and Laravel's own exception handling middleware catches that
+specific one and does the entire PRG flow automatically: redirect back to
+the previous page (the form <code>store()</code> was called from), with the
+validation errors flashed to the session, and every submitted field
+flashed alongside them. Nothing in <code>BookController@store</code> has to ask for
+any of that - it's already done by the time the response reaches the
+browser.</p>
+<p>That's the same shape as <code>redirect()-&gt;back()-&gt;withErrors()-&gt;withInput()</code>,
+written out by hand once in the PHP module - <code>validate()</code> just does it
+for you on failure, rather than making the controller call it explicitly.</p>
+<h2>Reading the flash data back: <code>old()</code> and <code>@error</code></h2>
+<p>Two things now need to appear in <code>books/create.blade.php</code>: the error
+message next to whatever field was wrong, and that field's own
+previously-submitted value, so the user doesn't have to retype the six
+fields they got right along with the one they didn't.</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">div</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">x-input-label</span> <span class="hljs-attr">for</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">:value</span>=<span class="hljs-string">&quot;__(&#x27;Title&#x27;)&quot;</span> /&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">x-text-input</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;title&quot;</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;text&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mt-1 block w-full&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{ old(&#x27;title&#x27;) }}&quot;</span> <span class="hljs-attr">required</span> <span class="hljs-attr">autofocus</span> /&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">x-input-error</span> <span class="hljs-attr">:messages</span>=<span class="hljs-string">&quot;$errors-&gt;get(&#x27;title&#x27;)&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mt-2&quot;</span> /&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+</code></pre>
+<p><code>old('title')</code> reads whatever was flashed to the session under that key,
+or an empty string if there's nothing flashed yet - the same value on a
+first visit to the form and after a failed submission, just empty in the
+first case. <code>$errors</code> is a variable Laravel makes available to every
+view automatically, whether or not the current request actually failed
+validation; <code>-&gt;get('title')</code> returns that field's messages as an array,
+or an empty array when there aren't any - <code>x-input-error</code> (a small
+component already used elsewhere in the app, just not explained until
+now) renders nothing at all when it's handed an empty array. Every field
+in the form gets the same two additions - <code>value=&quot;{{ old('...') }}&quot;</code> on
+its input, <code>x-input-error</code> underneath it - none of it new beyond the
+first field.</p>
+<h2>Trying it out</h2>
+<p>Submit the form with <code>title</code> blank now, and the exception, the 500 page,
+and the raw <code>SQLSTATE</code> message are all gone - the response is a redirect
+straight back to <code>/books/create</code>, with &quot;The title field is required.&quot;
+under the title box and every other field exactly as it was typed.
+Submit it correctly, and nothing about last topic's behaviour changed at
+all: the book saves and the browser lands on its show page.</p>
+<p><code>year</code> is worth trying deliberately, too: type <code>abc</code> instead of a
+number, and <code>integer</code> catches it the same way <code>required</code> caught the
+blank title - a message next to the field, everything else preserved.
+That one wasn't reachable at all last topic, since the browser's own
+<code>type=&quot;number&quot;</code> input already blocks non-numeric typing in most cases -
+but a request never has to come from a browser obeying its own form's
+constraints, so the server-side rule matters regardless of what the
+<code>&lt;input&gt;</code> claims to restrict.</p>
+</div>
+    
+  </main>
+</body>
+</html>
