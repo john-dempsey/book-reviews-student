@@ -59,4 +59,29 @@ class BookTest extends TestCase
         $this->assertNotEmpty($book->title);
         $this->assertGreaterThanOrEqual(1950, $book->year);
     }
+
+    public function test_the_search_scope_matches_a_books_title_an_authors_name_or_its_year(): void
+    {
+        $book = Book::factory()->create(['title' => 'Dune', 'year' => 1965]);
+        $book->authors()->attach(Author::factory()->create(['name' => 'Frank Herbert']));
+
+        $this->assertTrue(Book::search('Dune')->exists());
+        $this->assertTrue(Book::search('Herbert')->exists());
+        $this->assertTrue(Book::search('1965')->exists());
+    }
+
+    public function test_the_search_scope_finds_nothing_for_a_non_matching_term(): void
+    {
+        Book::factory()->create(['title' => 'Dune', 'year' => 1965]);
+
+        $this->assertFalse(Book::search('zzz')->exists());
+    }
+
+    public function test_the_search_scope_with_a_blank_term_returns_every_book(): void
+    {
+        Book::factory()->count(3)->create();
+
+        $this->assertSame(3, Book::search(null)->count());
+        $this->assertSame(3, Book::search('')->count());
+    }
 }

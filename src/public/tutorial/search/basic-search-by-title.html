@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Basic search by title — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/reviews/testing-reviews.html">← Testing reviews</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/search/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/search/search-by-author-and-year.html">Author, year, and the limits of LIKE →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/search/index.html">Lesson 5: Search</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Basic search by title</span>
+          
+        
+      </nav>
+    
+
+    <h1>Basic search by title</h1>
+    <p class="lede">A search box on books.index, backed by a query scope on Book - the first reusable, chainable piece of query logic this app has written on a model itself, plus withQueryString() to keep a search term alive across pagination links.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Twenty seeded books already spill across two pages of the catalogue.
+Browsing to find one specific title means scanning cards, page after
+page - fine at twenty, unworkable at two hundred. This topic adds the
+first way around that: a search box on <code>books.index</code> that narrows the
+list down to books whose title actually matches what was typed.</p>
+<h2>A query scope on <code>Book</code></h2>
+<p>Every query this app has written so far has lived inside a controller -
+<code>Book::with('authors')-&gt;withCount('reviews')...</code> in <code>BookController@index</code>,
+<code>auth()-&gt;user()-&gt;reviews()-&gt;with('book')...</code> in <code>ReviewController@mine</code>.
+A <strong>query scope</strong> is a small piece of that same kind of logic, written
+once on the model instead, so any query touching <code>Book</code> can reuse it by
+name:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">scopeSearch</span>(<span class="hljs-params">Builder <span class="hljs-variable">$query</span>, ?<span class="hljs-keyword">string</span> <span class="hljs-variable">$term</span></span>): <span class="hljs-title">Builder</span>
+</span>{
+    <span class="hljs-keyword">if</span> (! <span class="hljs-variable">$term</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-variable">$query</span>;
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-variable">$query</span>-&gt;<span class="hljs-title function_ invoke__">where</span>(<span class="hljs-string">&#x27;title&#x27;</span>, <span class="hljs-string">&#x27;like&#x27;</span>, <span class="hljs-string">&#x27;%&#x27;</span>.<span class="hljs-variable">$term</span>.<span class="hljs-string">&#x27;%&#x27;</span>);
+}
+</code></pre>
+<p>The <code>scope</code> prefix is a naming convention Eloquent looks for, not just a
+label - defining <code>scopeSearch()</code> is what makes <code>-&gt;search($term)</code> callable
+on any <code>Book</code> query, the same way defining <code>authors()</code> as a relationship
+is what makes <code>-&gt;authors</code> and <code>-&gt;authors()</code> both work. The early return
+matters as much as the <code>where()</code> itself: a blank or missing search term
+leaves the query exactly as it was handed in, untouched. That's what
+makes <code>-&gt;search($term)</code> safe to chain onto <em>every</em> request to this page,
+not just ones where a term was actually typed - nobody visiting
+<code>/books</code> with no search box filled in should see an empty page.</p>
+<p><code>where('title', 'like', '%'.$term.'%')</code> is plain SQL <code>LIKE</code>, wrapped in
+<code>%</code> on both sides so the term can match anywhere in the title, not just
+the start - typing &quot;sea&quot; should still find a book called &quot;The Restless
+Sea&quot;. It's also the simplest possible kind of matching: no ranking by
+relevance, no tolerance for a typo, no understanding of word boundaries.
+That trade-off is fine at twenty books and worth naming as a trade-off -
+the next topic comes back to what a real search feature would need
+instead.</p>
+<h2>Wiring it into <code>BookController@index</code></h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">index</span>(<span class="hljs-params">Request <span class="hljs-variable">$request</span></span>)
+</span>{
+    <span class="hljs-variable">$books</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">with</span>(<span class="hljs-string">&#x27;authors&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">withCount</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">withAvg</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>, <span class="hljs-string">&#x27;rating&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">search</span>(<span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">query</span>(<span class="hljs-string">&#x27;search&#x27;</span>))
+        -&gt;<span class="hljs-title function_ invoke__">orderBy</span>(<span class="hljs-string">&#x27;title&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">paginate</span>(<span class="hljs-number">12</span>)
+        -&gt;<span class="hljs-title function_ invoke__">withQueryString</span>();
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;books&#x27;</span>));
+}
+</code></pre>
+<p><code>-&gt;search($request-&gt;query('search'))</code> slots straight into the same
+chain <code>with()</code>, <code>withCount()</code>, and <code>withAvg()</code> already built - a scope
+returns a query builder exactly like every other method in that chain
+does, so nothing about how it composes with the rest is new. <code>$request -&gt;query('search')</code> reads the <code>search</code> key from the URL's query string
+specifically (<code>/books?search=...</code>), rather than <code>$request-&gt;input()</code>,
+which would just as happily read a same-named field from a POST body -
+worth being explicit about here, since the form below is a <code>GET</code>.</p>
+<p><code>-&gt;withQueryString()</code> is new, and solves a problem pagination alone
+doesn't: without it, clicking through to page 2 of a search's results
+would carry the page number but silently drop the search term, landing
+back on page 2 of the <em>entire</em> catalogue instead. <code>withQueryString()</code>
+tells the paginator to carry every current query string parameter -
+<code>search</code> included - onto every link it builds.</p>
+<h2>The search box, and staying on the page you searched</h2>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;GET&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.index&#x27;) }}&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mb-6 flex gap-3&quot;</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">input</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;search&quot;</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;search&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{ request(&#x27;search&#x27;) }}&quot;</span> <span class="hljs-attr">placeholder</span>=<span class="hljs-string">&quot;Search by title...&quot;</span>&gt;</span>
+
+    <span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;submit&quot;</span>&gt;</span>{{ __(&#x27;Search&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+
+    @if (request(&#x27;search&#x27;))
+        <span class="hljs-tag">&lt;<span class="hljs-name">a</span> <span class="hljs-attr">href</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.index&#x27;) }}&quot;</span>&gt;</span>{{ __(&#x27;Clear&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">a</span>&gt;</span>
+    @endif
+<span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+</code></pre>
+<p><code>method=&quot;GET&quot;</code> matters here in a way it hasn't for any other form in
+this app - every create/update form so far has been a <code>POST</code> (or a
+spoofed <code>PUT</code>/<code>PATCH</code>), because submitting one is supposed to change
+something. Searching doesn't change anything, and a <code>GET</code> request is
+what makes the result a real, shareable URL - <code>/books?search=Dune</code> can
+be bookmarked, pasted to someone else, or reached by pressing the
+browser's back button, none of which a <code>POST</code> result ever manages.
+That's also why there's no <code>@csrf</code> here: CSRF protection exists to stop
+a forged request from changing something on a user's behalf, and a
+<code>GET</code> request that only reads data isn't something Laravel asks for a
+token on.</p>
+<p><code>value=&quot;{{ request('search') }}&quot;</code> is the same repopulation idea topic
+3.2 introduced for <code>old()</code> on a failed form submission, aimed at a
+different source - <code>request('search')</code> reads straight from the current
+URL's query string, so the box shows whatever was just searched for
+instead of clearing itself out after every submit. The <code>@if (request('search'))</code> link only appears once a search is active, giving
+a one-click way back to the unfiltered catalogue.</p>
+<h2>Trying it out</h2>
+<p>Every seeded book's title is Faker-generated Latin, the same random text
+<code>BookFactory</code> has always produced - fine for filling a catalogue, useless
+for searching against by name, since it's different on every reseed.
+Topic 2.1 already covered pinning one attribute while leaving the rest to
+Faker (<code>Book::factory()-&gt;create(['title' =&gt; 'Dune'])</code>) as &quot;handy when a
+test cares about one specific value (a known title to search for, say)&quot; -
+exactly the situation now. In <code>tinker</code>:</p>
+<pre><code class="hljs">&gt; \App\Models\Book::factory()-&gt;create([&#x27;title&#x27; =&gt; &#x27;Dune&#x27;]);
+</code></pre>
+<p>Typing &quot;Dune&quot; into the search box and submitting narrows the catalogue
+down to that one book, with the box still showing &quot;Dune&quot; rather than
+resetting to blank. Typing something no title contains at all - &quot;zzz&quot;,
+say - shows a message in its place instead: &quot;No books match &quot;zzz&quot;.&quot;
+rather than the plain &quot;No books in the catalogue yet.&quot; message an
+actually-empty catalogue would show; those are two different situations,
+and the empty state now says which one happened.</p>
+<p>What this can't do yet is anything beyond a title. <code>AuthorSeeder</code> gives
+every seeded author a real, Faker-generated name of their own (unlike
+book titles, never pinned to anything fixed) - open <code>authors</code> in
+phpMyAdmin, pick any one of those five names, and search for it on
+<code>/books</code>. Nothing comes back, even though that author really did write
+one of the seeded books - the query never looks anywhere near the
+<code>authors</code> table, only <code>books.title</code>. That's next topic's job: extending
+the very same search box to look at an author's name and a book's year
+too, and a short look at what a search feature could grow into beyond
+that.</p>
+</div>
+    
+  </main>
+</body>
+</html>
