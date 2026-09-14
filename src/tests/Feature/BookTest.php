@@ -145,6 +145,68 @@ class BookTest extends TestCase
         Storage::disk('public')->assertMissing($path);
     }
 
+    public function test_the_index_page_search_matches_a_books_title(): void
+    {
+        $user = User::factory()->create();
+        Book::factory()->create(['title' => 'Dune']);
+        Book::factory()->create(['title' => 'Some Other Title']);
+
+        $response = $this->actingAs($user)->get(route('books.index', ['search' => 'Dune']));
+
+        $response->assertOk();
+        $response->assertSee('Dune');
+        $response->assertDontSee('Some Other Title');
+    }
+
+    public function test_the_index_page_search_matches_an_authors_name(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Dune']);
+        $book->authors()->attach(Author::factory()->create(['name' => 'Frank Herbert']));
+        Book::factory()->create(['title' => 'Some Other Title']);
+
+        $response = $this->actingAs($user)->get(route('books.index', ['search' => 'Herbert']));
+
+        $response->assertOk();
+        $response->assertSee('Dune');
+        $response->assertDontSee('Some Other Title');
+    }
+
+    public function test_the_index_page_search_matches_a_year(): void
+    {
+        $user = User::factory()->create();
+        Book::factory()->create(['title' => 'Dune', 'year' => 1965]);
+        Book::factory()->create(['title' => 'Some Other Title', 'year' => 1999]);
+
+        $response = $this->actingAs($user)->get(route('books.index', ['search' => '1965']));
+
+        $response->assertOk();
+        $response->assertSee('Dune');
+        $response->assertDontSee('Some Other Title');
+    }
+
+    public function test_the_index_page_shows_a_message_for_a_non_matching_search(): void
+    {
+        $user = User::factory()->create();
+        Book::factory()->create(['title' => 'Dune']);
+
+        $response = $this->actingAs($user)->get(route('books.index', ['search' => 'zzz']));
+
+        $response->assertOk();
+        $response->assertDontSee('Dune');
+        $response->assertSee('No books match "zzz".');
+    }
+
+    public function test_the_search_box_repopulates_with_the_current_search_term(): void
+    {
+        $user = User::factory()->create();
+        Book::factory()->create(['title' => 'Dune']);
+
+        $response = $this->actingAs($user)->get(route('books.index', ['search' => 'Dune']));
+
+        $response->assertSee('value="Dune"', false);
+    }
+
     public function test_the_full_create_edit_delete_flow(): void
     {
         $user = User::factory()->create();
