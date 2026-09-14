@@ -42,10 +42,11 @@ class Book extends Model
     }
 
     /**
-     * Restrict the query to books whose title contains the given search
-     * term. A blank/missing term leaves the query untouched, so this is
-     * always safe to chain onto - a search box with nothing typed into it
-     * should show the whole catalogue, not an empty page.
+     * Restrict the query to books whose title or an author's name contains
+     * the given search term, or whose year matches it exactly. A blank/
+     * missing term leaves the query untouched, so this is always safe to
+     * chain onto - a search box with nothing typed into it should show the
+     * whole catalogue, not an empty page.
      */
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
@@ -53,6 +54,13 @@ class Book extends Model
             return $query;
         }
 
-        return $query->where('title', 'like', '%'.$term.'%');
+        return $query->where(function (Builder $query) use ($term) {
+            $query->where('title', 'like', '%'.$term.'%')
+                ->orWhereHas('authors', fn (Builder $query) => $query->where('name', 'like', '%'.$term.'%'));
+
+            if (is_numeric($term)) {
+                $query->orWhere('year', $term);
+            }
+        });
     }
 }

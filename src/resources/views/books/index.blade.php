@@ -14,7 +14,7 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <form method="GET" action="{{ route('books.index') }}" class="mb-6 flex gap-3">
-                <input type="search" name="search" value="{{ request('search') }}" placeholder="Search by title..."
+                <input type="search" name="search" value="{{ request('search') }}" placeholder="Search by title, author, or year..."
                        class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500">
 
                 <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">

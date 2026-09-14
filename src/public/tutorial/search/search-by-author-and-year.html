@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Author, year, and the limits of LIKE — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/search/basic-search-by-title.html">← Basic search by title</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/search/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/search/index.html">Lesson 5: Search</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Author, year, and the limits of LIKE</span>
+          
+        
+      </nav>
+    
+
+    <h1>Author, year, and the limits of LIKE</h1>
+    <p class="lede">Widening scopeSearch() to also match an author&#39;s name and a book&#39;s year - orWhereHas(), a grouped where() closure to keep the OR conditions from leaking into the rest of the query, and a short look at what LIKE can&#39;t do.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Topic 5.1 left one gap open on purpose: the search box only ever looked
+at <code>books.title</code>. Searching for an author's name found nothing, even
+when that author really had written a seeded book. This topic closes
+that gap - the same search box, one query scope widened to look in two
+more places - and then stops to name what still wouldn't work even
+after that, since a <code>LIKE</code> query was never going to be the last word on
+search.</p>
+<h2>Widening the scope</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">scopeSearch</span>(<span class="hljs-params">Builder <span class="hljs-variable">$query</span>, ?<span class="hljs-keyword">string</span> <span class="hljs-variable">$term</span></span>): <span class="hljs-title">Builder</span>
+</span>{
+    <span class="hljs-keyword">if</span> (! <span class="hljs-variable">$term</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-variable">$query</span>;
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-variable">$query</span>-&gt;<span class="hljs-title function_ invoke__">where</span>(function (Builder <span class="hljs-variable">$query</span>) <span class="hljs-keyword">use</span> ($<span class="hljs-title">term</span>) {
+        $<span class="hljs-title">query</span>-&gt;<span class="hljs-title">where</span>(&#x27;<span class="hljs-title">title</span>&#x27;, &#x27;<span class="hljs-title">like</span>&#x27;, &#x27;%&#x27;.$<span class="hljs-title">term</span>.&#x27;%&#x27;)
+            -&gt;<span class="hljs-title">orWhereHas</span>(&#x27;<span class="hljs-title">authors</span>&#x27;, <span class="hljs-title">fn</span> (<span class="hljs-title">Builder</span> $<span class="hljs-title">query</span>) =&gt; $<span class="hljs-title">query</span>-&gt;<span class="hljs-title">where</span>(&#x27;<span class="hljs-title">name</span>&#x27;, &#x27;<span class="hljs-title">like</span>&#x27;, &#x27;%&#x27;.$<span class="hljs-title">term</span>.&#x27;%&#x27;));
+
+        <span class="hljs-keyword">if</span> (<span class="hljs-title function_ invoke__">is_numeric</span>(<span class="hljs-variable">$term</span>)) {
+            <span class="hljs-variable">$query</span>-&gt;<span class="hljs-title function_ invoke__">orWhere</span>(<span class="hljs-string">&#x27;year&#x27;</span>, <span class="hljs-variable">$term</span>);
+        }
+    });
+}
+</code></pre>
+<p>The blank-term guard at the top is untouched from topic 5.1 - still the
+first thing checked, still what makes <code>-&gt;search($term)</code> safe to chain
+onto every request. Everything new lives inside the <code>where(function ...)</code>
+closure that now wraps the old <code>where('title', ...)</code> call.</p>
+<p><code>orWhereHas('authors', ...)</code> is the relationship version of the <code>orWhere</code>
+this app has already used for a simple column - <code>Book</code> doesn't have an
+author's name as one of its own columns, only a <code>belongsToMany</code>
+relationship to <code>Author</code>, so matching against it means asking &quot;does this
+book have <em>any</em> author whose name matches?&quot; rather than comparing a
+column directly. The closure passed in (<code>fn (Builder $query) =&gt; ...</code>)
+runs against a query on <code>Author</code>, not <code>Book</code> - inside it, <code>'name'</code> refers
+to <code>authors.name</code>, the same way <code>'title'</code> outside it refers to
+<code>books.title</code>.</p>
+<p>The <code>is_numeric($term)</code> check guards the year match for a reason <code>title</code>
+and <code>name</code> don't need: <code>year</code> is a genuine numeric column, and comparing
+it against a term that isn't a number at all (<code>'Herbert'</code>, say) is a
+comparison SQL would happily attempt and Laravel would happily send, but
+one that can never usefully match anything. Skipping it when the term
+obviously isn't a year is about not asking a pointless question, not
+about correctness - <code>orWhere('year', 'Herbert')</code> wouldn't break anything
+by matching, it would just never match, so there'd be no bug from
+leaving it out. It's also why the year match is <code>orWhere('year', $term)</code></p>
+<ul>
+<li>an <em>exact</em> match - rather than the <code>LIKE '%...%'</code> pattern <code>title</code> and
+<code>name</code> use. A year is one specific number a person is thinking of when
+they type it, not a phrase someone might remember only part of; matching
+&quot;196&quot; against every year that merely <em>contains</em> those digits (1960,
+1961, ..., 1968, 1969, but also 2196 if this catalogue ever grew that
+old) would find noise, not the book being searched for.</li>
+</ul>
+<h2>Why the whole thing sits inside one <code>where()</code></h2>
+<p>The outer <code>where(function (Builder $query) use ($term) { ... })</code> isn't
+decoration - it's what keeps three <code>orWhere</code>-flavoured conditions from
+escaping the scope entirely. Eloquent (and the SQL underneath it) reads
+<code>where(...)-&gt;orWhere(...)-&gt;orWhere(...)</code>, all directly on the same query,
+as one flat chain: <em>anything</em> else already added to that query becomes
+one more term the <code>OR</code> reaches across, not something the search terms
+are jointly required to also satisfy. Nothing in <code>BookController@index</code>
+currently adds another condition alongside <code>-&gt;search(...)</code>, so this
+scope would happen to return the right rows either way, today. But a
+scope's whole purpose is to be reusable from <em>any</em> query touching
+<code>Book</code> - the moment something else adds, say, a
+<code>-&gt;where('year', '&gt;', 2000)</code> filter to some other page that also calls
+<code>-&gt;search($term)</code>, an ungrouped <code>orWhereHas</code> or <code>orWhere('year', ...)</code>
+would silently OR its way past that filter instead of narrowing within
+it. Wrapping the three conditions in one <code>where(function ...)</code> closure
+forces the SQL to parenthesize them together - <code>WHERE (title LIKE ? OR ... OR year = ?)</code> - so the whole group behaves as a single condition
+that any other <code>where()</code> on the query still applies alongside, not
+around.</p>
+<h2>The search box's label</h2>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">input</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;search&quot;</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;search&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{ request(&#x27;search&#x27;) }}&quot;</span> <span class="hljs-attr">placeholder</span>=<span class="hljs-string">&quot;Search by title, author, or year...&quot;</span>
+</span></code></pre>
+<p>Nothing about the form itself changed - same <code>GET</code>, same <code>value=&quot;{{ request('search') }}&quot;</code>, same conditional &quot;Clear&quot; link. Only the
+placeholder text needed updating, since the box now genuinely searches
+all three.</p>
+<h2>Trying it out</h2>
+<p>Reusing topic 5.1's pinned example, this time giving it a real author
+and year too:</p>
+<pre><code class="hljs">&gt; $book = \App\Models\Book::factory()-&gt;create([&#x27;title&#x27; =&gt; &#x27;Dune&#x27;, &#x27;year&#x27; =&gt; 1965]);
+&gt; $book-&gt;authors()-&gt;attach(\App\Models\Author::factory()-&gt;create([&#x27;name&#x27; =&gt; &#x27;Frank Herbert&#x27;]));
+</code></pre>
+<p>Searching <code>/books?search=Herbert</code> now finds <em>Dune</em> even though the word
+&quot;Herbert&quot; appears nowhere in its title - the match came from
+<code>orWhereHas('authors', ...)</code> instead. Searching <code>1965</code> finds it too,
+this time from the numeric <code>orWhere('year', ...)</code> branch. Searching
+<code>Dune</code> still works exactly as it did in topic 5.1 - the original
+<code>title</code> branch never went away, it just gained two neighbours inside the
+same grouped <code>where()</code>.</p>
+<h2>What a real search feature would still need</h2>
+<p>Widening <code>LIKE</code> to two more columns is more coverage, not a different
+kind of search - every limitation topic 5.1 named is still there, just
+harder to notice with three columns to try instead of one:</p>
+<ul>
+<li><strong>No relevance ranking.</strong> A search for &quot;the&quot; would match a large
+fraction of any real catalogue's titles and descriptions, all
+returned in the same <code>orderBy('title')</code> order regardless of how well
+each one actually matches - there's no notion of <em>how good</em> a match
+is, only whether one exists at all.</li>
+<li><strong>No tolerance for a typo.</strong> Searching &quot;Herburt&quot; finds nothing,
+even though a human reading it would recognise the name instantly.
+<code>LIKE</code> compares characters, not meaning.</li>
+<li><strong>No index to make it fast.</strong> A <code>LIKE '%term%'</code> with a wildcard on
+<em>both</em> sides can't use a standard database index the way
+<code>WHERE id = ?</code> or even <code>LIKE 'term%'</code> (wildcard on one side only)
+can - the database has no choice but to check every row. Fine at
+twenty seeded books; a real catalogue of hundreds of thousands would
+feel it.</li>
+</ul>
+<p>Solving any of these for real is a job for a dedicated search tool built
+for exactly this - Laravel's own
+<a href="https://laravel.com/docs/scout">Scout</a> package, backed by something
+like MySQL/PostgreSQL full-text indexes, Meilisearch, or Algolia -
+rather than more clauses bolted onto a query scope. That's deliberately
+out of scope here: Lesson 5's job was a flavour of what search involves
+(a query scope, a <code>GET</code> form, keeping a term alive across pagination),
+not a production-grade search feature. Automated tests locking in
+today's matching behaviour - and its non-matches - are next.</p>
+</div>
+    
+  </main>
+</body>
+</html>
