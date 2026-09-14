@@ -63,6 +63,11 @@
             <p>A /my-reviews page listing everything the logged-in user has written, across every book - a plain route rather than a resource action, auth()-&gt;user()-&gt;reviews() reused the same way books.index already reuses withCount/withAvg, and latest() as a small new shorthand.</p>
           </li>
         
+          <li>
+            <a href="/tutorial/reviews/testing-reviews.html">Testing reviews</a>
+            <p>Feature tests for writing, editing, and deleting a review - the same happy-path/validation-failure shape lesson 3.5 used for books, plus the one thing books never needed: proving the ownership check actually returns a 403 when someone else tries.</p>
+          </li>
+        
       </ul>
     
 
