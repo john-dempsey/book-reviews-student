@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My reviews — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/reviews/editing-and-deleting-your-own-review.html">← Editing and deleting your own review</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/reviews/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/reviews/testing-reviews.html">Testing reviews →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/reviews/index.html">Lesson 4: Reviews</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">My reviews</span>
+          
+        
+      </nav>
+    
+
+    <h1>My reviews</h1>
+    <p class="lede">A /my-reviews page listing everything the logged-in user has written, across every book - a plain route rather than a resource action, auth()-&gt;user()-&gt;reviews() reused the same way books.index already reuses withCount/withAvg, and latest() as a small new shorthand.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Every review so far has only ever been seen in the context of the book
+it's about - written from a book's page, edited and deleted from a link
+sitting right next to it on that same page. There's still no way to
+answer a simpler question: <em>what have I actually written, across every
+book I've reviewed?</em> This topic adds exactly that - one page, listing
+every review the logged-in user has ever left.</p>
+<h2>A route that isn't one of the seven</h2>
+<p>Every route this app has added so far has been part of a
+<code>Route::resource()</code> call - <code>index</code>, <code>create</code>, <code>store</code>, <code>show</code>, <code>edit</code>,
+<code>update</code>, <code>destroy</code>, always some subset of the same seven names. This
+page doesn't fit any of them. It isn't <code>reviews.index</code>, because a global
+listing of <em>every</em> review ever written isn't a page this app has -
+reviews are always shown in the context of a book (<code>books.show</code>) or, from
+this topic on, in the context of a user. Trying to force it into <code>index</code>
+would mean teaching a lie: that this page lists &quot;the reviews resource,&quot;
+when it actually lists one particular relationship for one particular
+person. So it gets a plain route instead, the same way <code>/dashboard</code>
+already does:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-string">&#x27;/my-reviews&#x27;</span>, [<span class="hljs-title class_">ReviewController</span>::<span class="hljs-variable language_">class</span>, <span class="hljs-string">&#x27;mine&#x27;</span>])-&gt;<span class="hljs-title function_ invoke__">name</span>(<span class="hljs-string">&#x27;reviews.mine&#x27;</span>);
+</code></pre>
+<p><code>reviews.mine</code> still lives under the <code>reviews.</code> naming umbrella, the same
+namespacing <code>reviews.edit</code>/<code>reviews.update</code>/<code>reviews.destroy</code> already
+use, even though it isn't one of <code>Route::resource()</code>'s generated names -
+nothing about route naming <em>requires</em> the seven resource names, they're
+just the ones <code>Route::resource()</code> happens to generate automatically.</p>
+<h2><code>ReviewController@mine</code>: whose reviews, and how many</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">mine</span>(<span class="hljs-params"></span>)
+</span>{
+    <span class="hljs-variable">$reviews</span> = <span class="hljs-title function_ invoke__">auth</span>()-&gt;<span class="hljs-title function_ invoke__">user</span>()-&gt;<span class="hljs-title function_ invoke__">reviews</span>()
+        -&gt;<span class="hljs-title function_ invoke__">with</span>(<span class="hljs-string">&#x27;book&#x27;</span>)
+        -&gt;<span class="hljs-title function_ invoke__">latest</span>()
+        -&gt;<span class="hljs-title function_ invoke__">paginate</span>(<span class="hljs-number">12</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;reviews.mine&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>));
+}
+</code></pre>
+<p><code>auth()-&gt;user()-&gt;reviews()</code> calls the <code>HasMany</code> relationship
+<code>User::reviews()</code> already defined - the same relationship
+<code>$book-&gt;reviews()</code> has used from a <code>Book</code>'s side since Lesson 1, just
+walked from the other end. Calling it with <code>()</code> (rather than the
+property access <code>auth()-&gt;user()-&gt;reviews</code>, which would run the query and
+return every row at once) is what makes it a query builder that
+<code>-&gt;with()</code>, <code>-&gt;latest()</code>, and <code>-&gt;paginate()</code> can still be chained onto -
+exactly the same builder-vs-already-loaded distinction <code>books.index</code>
+relies on when it calls <code>Book::with('authors')</code> instead of loading a
+<code>Book</code> first and asking about its authors after.</p>
+<p><code>-&gt;with('book')</code> eager-loads each review's book in the same one extra
+query <code>books.show</code>'s own <code>$book-&gt;load(['authors', 'reviews.user'])</code>
+already uses to avoid running a fresh query per row - this page prints
+every review's book title, so without it there'd be one query per
+review instead of one query total. <code>-&gt;paginate(12)</code> is the exact same
+call <code>books.index</code> already makes, same page size and everything - a
+user with more written reviews than fit on one page gets the same
+<code>{{ $reviews-&gt;links() }}</code> footer books.index already renders, for free.</p>
+<p><code>-&gt;latest()</code> is new, though small: it's shorthand for
+<code>orderByDesc('created_at')</code> - Eloquent's own name for &quot;the normal way to
+sort things by recency.&quot; Every listing so far (<code>books.index</code>,
+<code>authors.index</code>) has sorted by name instead, because a catalogue is
+naturally alphabetical; a list of <em>your own</em> reviews reads more
+naturally most-recent-first, so this is the first place recency order
+actually fits better.</p>
+<h2>The view: one card per review, this time with the book's name on it</h2>
+<p><code>reviews/partials/review.blade.php</code> already exists - the partial
+<code>books/show.blade.php</code> loops over to print each review on a book's page.
+It leads with <code>$review-&gt;user-&gt;name</code>, because on a book's page the
+interesting question is <em>who</em> wrote each review; the book itself is
+already the whole page. Here it's the reverse - every review belongs to
+the same person, so printing that person's own name back at them on
+every row would be pointless. What's actually useful here is <em>which
+book</em> each review is about, so this gets its own small partial rather
+than reusing that one:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;border-b border-gray-200 py-4 last:border-b-0&quot;</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;flex items-center justify-between&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">a</span> <span class="hljs-attr">href</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.show&#x27;, $review-&gt;book) }}&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;font-medium text-gray-900 hover:underline&quot;</span>&gt;</span>
+            {{ $review-&gt;book-&gt;title }}
+        <span class="hljs-tag">&lt;/<span class="hljs-name">a</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-sm text-gray-500&quot;</span>&gt;</span>{{ $review-&gt;rating }} / 5<span class="hljs-tag">&lt;/<span class="hljs-name">span</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+
+    @if ($review-&gt;comment)
+        <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-gray-700 mt-1&quot;</span>&gt;</span>{{ $review-&gt;comment }}<span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+    @endif
+
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;flex items-center justify-between mt-1&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-xs text-gray-400&quot;</span>&gt;</span>{{ $review-&gt;created_at-&gt;format(&#x27;d M Y&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+
+        <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;flex items-center gap-3&quot;</span>&gt;</span>
+            <span class="hljs-tag">&lt;<span class="hljs-name">a</span> <span class="hljs-attr">href</span>=<span class="hljs-string">&quot;{{ route(&#x27;reviews.edit&#x27;, $review) }}&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-xs text-gray-500 hover:text-gray-800 hover:underline&quot;</span>&gt;</span>
+                {{ __(&#x27;Edit&#x27;) }}
+            <span class="hljs-tag">&lt;/<span class="hljs-name">a</span>&gt;</span>
+
+            <span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;reviews.destroy&#x27;, $review) }}&quot;</span>
+                  <span class="hljs-attr">onsubmit</span>=<span class="hljs-string">&quot;return confirm(&#x27;Delete this review? This cannot be undone.&#x27;);&quot;</span>&gt;</span>
+                @csrf
+                @method(&#x27;DELETE&#x27;)
+                <span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;submit&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-xs text-red-600 hover:text-red-800 hover:underline&quot;</span>&gt;</span>
+                    {{ __(&#x27;Delete&#x27;) }}
+                <span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+            <span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+        <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+</code></pre>
+<p>Notice what's missing compared to the book-page version: no
+<code>@if ($review-&gt;user_id === auth()-&gt;id())</code> around the Edit/Delete
+controls. On a book's page, most reviews belong to someone else, so
+that check decides whether to show the controls at all. Every review
+<code>reviews.mine</code> ever lists belongs to the person viewing the page - the
+query itself, <code>auth()-&gt;user()-&gt;reviews()</code>, already guarantees that -
+so there's nothing left to check before showing them. The links point
+at the exact same <code>reviews.edit</code>/<code>reviews.destroy</code> routes either way,
+still guarded server-side by <code>authorizeOwner()</code> regardless of which
+page linked to them.</p>
+<p><code>reviews/mine.blade.php</code> wraps that partial the same way <code>books/index.blade.php</code>
+wraps <code>books/partials/card.blade.php</code> - a <code>@forelse</code>, an <code>@empty</code> branch
+for a user who hasn't reviewed anything yet, and the same
+<code>{{ $reviews-&gt;links() }}</code> footer:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">x-app-layout</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">x-slot</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;header&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">h2</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;font-semibold text-xl text-gray-800 leading-tight&quot;</span>&gt;</span>
+            {{ __(&#x27;My Reviews&#x27;) }}
+        <span class="hljs-tag">&lt;/<span class="hljs-name">h2</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">x-slot</span>&gt;</span>
+
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;py-12&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;max-w-4xl mx-auto sm:px-6 lg:px-8&quot;</span>&gt;</span>
+            <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;bg-white overflow-hidden shadow-sm rounded-lg p-6&quot;</span>&gt;</span>
+                @forelse ($reviews as $review)
+                    @include(&#x27;reviews.partials.mine-row&#x27;, [&#x27;review&#x27; =&gt; $review])
+                @empty
+                    <span class="hljs-tag">&lt;<span class="hljs-name">p</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-gray-600&quot;</span>&gt;</span>
+                        {{ __(&quot;You haven&#x27;t reviewed any books yet.&quot;) }}
+                        <span class="hljs-tag">&lt;<span class="hljs-name">a</span> <span class="hljs-attr">href</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.index&#x27;) }}&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;text-gray-800 underline&quot;</span>&gt;</span>{{ __(&#x27;Browse the catalogue&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">a</span>&gt;</span>
+                        {{ __(&#x27;to find one.&#x27;) }}
+                    <span class="hljs-tag">&lt;/<span class="hljs-name">p</span>&gt;</span>
+                @endforelse
+            <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+
+            <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mt-6&quot;</span>&gt;</span>
+                {{ $reviews-&gt;links() }}
+            <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+        <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">x-app-layout</span>&gt;</span>
+</code></pre>
+<h2>One more link in the navigation</h2>
+<p>Books and Authors have had their own link in the top navigation bar
+since Lesson 2. &quot;My Reviews&quot; joins them - in both the desktop menu and
+its collapsed mobile equivalent - pointing at the new named route:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">x-nav-link</span> <span class="hljs-attr">:href</span>=<span class="hljs-string">&quot;route(&#x27;reviews.mine&#x27;)&quot;</span> <span class="hljs-attr">:active</span>=<span class="hljs-string">&quot;request()-&gt;routeIs(&#x27;reviews.mine&#x27;)&quot;</span>&gt;</span>
+    {{ __(&#x27;My Reviews&#x27;) }}
+<span class="hljs-tag">&lt;/<span class="hljs-name">x-nav-link</span>&gt;</span>
+</code></pre>
+<h2>Trying it out</h2>
+<p>Log in and click &quot;My Reviews&quot; in the navigation bar, and every review
+written by that account shows up, most recent first, each one linking
+back to its own book - fifteen written reviews means a second page,
+reached through the same pagination links <code>books.index</code> already taught.
+Click a book's title from this page and it lands on <code>books.show</code>, the
+same page the review was originally written from. Edit or delete a
+review from here, and it behaves exactly as it did from the book's own
+page, because it's the exact same route either way - this page is just
+a second way of reaching it.</p>
+<p>Log in as a brand-new account that hasn't reviewed anything yet, and the
+page shows a plain message instead of an empty list, with a link back to
+the catalogue to go find something to review.</p>
+<p>Between all three review topics, the app now has the complete other half
+of &quot;book reviews&quot;: write one, fix or retract it, and see every one you've
+written in one place - all of it guarded so that only the person who
+wrote a review can ever change or remove it. What hasn't been checked yet
+is that the ownership guard actually holds up under a real, automated
+test rather than manual curl requests - that's the next and final topic
+of this lesson.</p>
+</div>
+    
+  </main>
+</body>
+</html>

@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthorController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -21,6 +22,22 @@ Route::middleware('auth')->group(function () {
     // Full CRUD on the catalogue.
     Route::resource('books', BookController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
     Route::resource('authors', AuthorController::class)->only(['index', 'show']);
+
+    // Nested under its book - a review only ever makes sense in the
+    // context of one - so the URL says so: /books/{book}/reviews/create,
+    // /books/{book}/reviews.
+    Route::resource('books.reviews', ReviewController::class)->only(['create', 'store']);
+
+    // Editing or deleting a review, by contrast, never needs its book in
+    // the URL - /reviews/{review} already identifies exactly one row, so
+    // this half of the same controller gets its own flat resource route.
+    Route::resource('reviews', ReviewController::class)->only(['edit', 'update', 'destroy']);
+
+    // Not one of the seven resource actions - a review is always scoped to
+    // a book (books.reviews.*) or, here, to the logged-in user, never
+    // listed globally, so this gets its own plain route rather than a
+    // resource index that doesn't fit either shape.
+    Route::get('/my-reviews', [ReviewController::class, 'mine'])->name('reviews.mine');
 });
 
 require __DIR__.'/auth.php';

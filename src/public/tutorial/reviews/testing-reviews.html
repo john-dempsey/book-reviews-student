@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testing reviews — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/reviews/my-reviews.html">← My reviews</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/reviews/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/reviews/index.html">Lesson 4: Reviews</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Testing reviews</span>
+          
+        
+      </nav>
+    
+
+    <h1>Testing reviews</h1>
+    <p class="lede">Feature tests for writing, editing, and deleting a review - the same happy-path/validation-failure shape lesson 3.5 used for books, plus the one thing books never needed: proving the ownership check actually returns a 403 when someone else tries.</p>
+
+    
+
+    
+      <div class="topic-body"><p><code>Unit\ReviewTest</code> already covers the <code>Review</code> model itself - it belongs
+to a book, it belongs to a user, the unique index stops a duplicate.
+None of that touches a controller, a route, or the <code>abort(403)</code> guard
+topic 4.2 added. This topic closes that gap the same way 3.5 closed it
+for books: a new <code>Tests\Feature\ReviewTest</code>, proving the actual HTTP
+routes behave the way clicking through the app has only shown so far.</p>
+<h2>Writing a review: the happy path</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_review_can_be_created</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">post</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.reviews.store&#x27;</span>, <span class="hljs-variable">$book</span>), [
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">4</span>,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;Solid read.&#x27;</span>,
+    ]);
+
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">firstWhere</span>([<span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id, <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id]);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>));
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertNotNull</span>(<span class="hljs-variable">$review</span>);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">4</span>, <span class="hljs-variable">$review</span>-&gt;rating);
+}
+</code></pre>
+<p>Nothing here is new mechanism - <code>route('books.reviews.store', $book)</code>
+builds the nested URL from topic 4.1's resource route exactly the way
+<code>route('books.show', $book)</code> always has, and <code>firstWhere()</code> with an
+array narrows to the one row this test actually cares about the same
+way <code>BookTest</code>'s <code>firstWhere('title', ...)</code> already does with a single
+column.</p>
+<h2>Writing a review: the validation failure</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_creating_a_review_without_a_rating_fails_validation_and_repopulates_the_form</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)
+        -&gt;<span class="hljs-keyword">from</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.reviews.create&#x27;</span>, <span class="hljs-variable">$book</span>))
+        -&gt;<span class="hljs-title function_ invoke__">post</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.reviews.store&#x27;</span>, <span class="hljs-variable">$book</span>), [
+            <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-string">&#x27;&#x27;</span>,
+            <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;Should not save.&#x27;</span>,
+        ]);
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.reviews.create&#x27;</span>, <span class="hljs-variable">$book</span>));
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSessionHasErrors</span>(<span class="hljs-string">&#x27;rating&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSessionHasInput</span>(<span class="hljs-string">&#x27;comment&#x27;</span>, <span class="hljs-string">&#x27;Should not save.&#x27;</span>);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertDatabaseMissing</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>, [<span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;Should not save.&#x27;</span>]);
+}
+</code></pre>
+<p>The exact same four-assertion shape 3.5 used for a book without a
+title: <code>-&gt;from()</code> sets a real previous URL for <code>validate()</code>'s
+redirect-back to return to, <code>assertSessionHasErrors()</code> checks the
+flashed error bag, <code>assertSessionHasInput()</code> checks the flashed old
+input, and <code>assertDatabaseMissing()</code> confirms no half-valid row landed
+regardless. Only the field name and the route names changed.</p>
+<h2>Writing a review: the uniqueness failure</h2>
+<p>Books never had a second way to fail creating one - reviews do, from
+topic 4.1's business-rule check against an existing row rather than
+against the submitted fields:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_reviewing_the_same_book_twice_fails_with_a_friendly_error</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id, <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">post</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.reviews.store&#x27;</span>, <span class="hljs-variable">$book</span>), [
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">3</span>,
+    ]);
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSessionHasErrors</span>(<span class="hljs-string">&#x27;rating&#x27;</span>);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertCount</span>(<span class="hljs-number">1</span>, <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">reviews</span>()-&gt;<span class="hljs-title function_ invoke__">where</span>(<span class="hljs-string">&#x27;user_id&#x27;</span>, <span class="hljs-variable">$user</span>-&gt;id)-&gt;<span class="hljs-title function_ invoke__">get</span>());
+}
+</code></pre>
+<p>This proves the friendly <code>back()-&gt;withErrors([...])</code> path 4.1 wrote
+actually runs before the database ever gets a chance to reject the
+second row with the raw <code>SQLSTATE[23000]</code> error that topic's content
+quoted - the count staying at exactly <code>1</code> is the check that matters,
+not the error message's wording.</p>
+<h2>Editing and deleting a review, as its own author</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_review_can_be_updated_by_its_owner</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id, <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">2</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">put</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.update&#x27;</span>, <span class="hljs-variable">$review</span>), [
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">5</span>,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;Changed my mind - loved it.&#x27;</span>,
+    ]);
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$review</span>-&gt;book));
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">5</span>, <span class="hljs-variable">$review</span>-&gt;<span class="hljs-title function_ invoke__">fresh</span>()-&gt;rating);
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_review_can_be_deleted_by_its_owner</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id]);
+    <span class="hljs-variable">$book</span> = <span class="hljs-variable">$review</span>-&gt;book;
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">delete</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.destroy&#x27;</span>, <span class="hljs-variable">$review</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>));
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertModelMissing</span>(<span class="hljs-variable">$review</span>);
+}
+</code></pre>
+<p><code>Review::factory()-&gt;create(['user_id' =&gt; $user-&gt;id])</code> is worth noticing:
+<code>ReviewFactory</code>'s <code>definition()</code> already gives every review its own
+factory-made book by default, so setting only <code>user_id</code> here is enough</p>
+<ul>
+<li>exactly the &quot;override just the column this test cares about&quot; pattern
+<code>BookTest</code> already relies on throughout 3.5. <code>$book = $review-&gt;book</code> is
+read out before the delete for the same reason <code>ReviewController@destroy</code>
+itself reads it first: gone rows can't be traced back to their book
+afterwards. Both tests otherwise reuse <code>fresh()</code> and <code>assertModelMissing()</code>
+exactly as 3.5 introduced them for books, on a review instead.</li>
+</ul>
+<h2>Proving the 403 is real, not just a hidden button</h2>
+<p>Topic 4.2's ownership check was only ever confirmed by hand - log in as
+someone else, type a URL, see a &quot;Forbidden&quot; page. That's the one genuinely
+new kind of test this topic adds: three requests, each acting as a user
+who didn't write the review, each expecting to be turned away before
+anything changes:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_editing_someone_elses_review_is_forbidden</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$owner</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$owner</span>-&gt;id]);
+    <span class="hljs-variable">$someoneElse</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$someoneElse</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.edit&#x27;</span>, <span class="hljs-variable">$review</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertForbidden</span>();
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_updating_someone_elses_review_is_forbidden</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$owner</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$owner</span>-&gt;id, <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">3</span>]);
+    <span class="hljs-variable">$someoneElse</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$someoneElse</span>)-&gt;<span class="hljs-title function_ invoke__">put</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.update&#x27;</span>, <span class="hljs-variable">$review</span>), [
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">1</span>,
+    ]);
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertForbidden</span>();
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">3</span>, <span class="hljs-variable">$review</span>-&gt;<span class="hljs-title function_ invoke__">fresh</span>()-&gt;rating);
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_deleting_someone_elses_review_is_forbidden</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$owner</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$owner</span>-&gt;id]);
+    <span class="hljs-variable">$someoneElse</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$someoneElse</span>)-&gt;<span class="hljs-title function_ invoke__">delete</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.destroy&#x27;</span>, <span class="hljs-variable">$review</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertForbidden</span>();
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertModelExists</span>(<span class="hljs-variable">$review</span>);
+}
+</code></pre>
+<p><code>assertForbidden()</code> is new: it's shorthand for asserting a <code>403</code> status
+code specifically, reading exactly as plainly as the <code>abort(403)</code> it's
+checking for. Two of the three go further than just the status code -
+<code>updating</code>'s test confirms the rating actually stayed <code>3</code>, and
+<code>deleting</code>'s confirms the row still exists with <code>assertModelExists()</code>
+(the positive counterpart to 3.5's <code>assertModelMissing()</code>) - a 403
+alone would still pass if <code>authorizeOwner()</code> somehow ran <em>after</em> the
+change instead of before it, so the real claim being tested is &quot;nothing
+happened,&quot; not just &quot;the response looked right.&quot;</p>
+<h2>One test that runs the whole thing in sequence</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_full_write_edit_delete_flow_as_the_reviews_own_author</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$createResponse</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">post</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.reviews.store&#x27;</span>, <span class="hljs-variable">$book</span>), [
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">3</span>,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;Decent.&#x27;</span>,
+    ]);
+    <span class="hljs-variable">$review</span> = <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">firstWhere</span>([<span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id, <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id]);
+    <span class="hljs-variable">$createResponse</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>));
+
+    <span class="hljs-variable">$updateResponse</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">put</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.update&#x27;</span>, <span class="hljs-variable">$review</span>), [
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">5</span>,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;Actually, loved it on a re-read.&#x27;</span>,
+    ]);
+    <span class="hljs-variable">$updateResponse</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>));
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">5</span>, <span class="hljs-variable">$review</span>-&gt;<span class="hljs-title function_ invoke__">fresh</span>()-&gt;rating);
+
+    <span class="hljs-variable">$deleteResponse</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">delete</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.destroy&#x27;</span>, <span class="hljs-variable">$review</span>));
+    <span class="hljs-variable">$deleteResponse</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>));
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertModelMissing</span>(<span class="hljs-variable">$review</span>);
+}
+</code></pre>
+<p>The same closing move 3.5 made for books: every assertion here already
+appeared above in isolation, just chained - the row <code>books.reviews.store</code>
+creates is the same one <code>reviews.update</code> and <code>reviews.destroy</code> both act
+on next, the way actually using the app would carry it through. A bug
+that only shows up once a second action runs against a row a first
+action just created - stale <code>$review</code> data after a redirect, say -
+is exactly what the isolated tests above wouldn't catch on their own.</p>
+<h2>Running everything</h2>
+<pre><code class="hljs">Tests:    65 passed (165 assertions)
+</code></pre>
+<p>Nine new tests, all in the new <code>Tests\Feature\ReviewTest</code> -
+<code>Unit\ReviewTest</code>'s five model-level tests from earlier lessons need no
+changes. Every test written since Lesson 1 still passes alongside them.</p>
+<h2>Lesson 4 complete</h2>
+<p>A review can be written, fixed, taken back, and found again later from
+<code>/my-reviews</code> - all of it now proven by tests that run on every future
+change, not just the one time each path was clicked through by hand or
+checked with a manual <code>curl</code> request. Between the four lessons so far,
+the catalogue can be seeded and browsed, a book can be added, edited,
+and deleted with its cover image kept in sync, and now a review can be
+written, changed, or withdrawn, always as yourself and never as anyone
+else.</p>
+<p>There's still no way to find anything, though - browsing the catalogue
+means paging through every book in order, whatever you're actually
+looking for. Lesson 5 picks up from here with search: finding a book by
+title, author, or year instead.</p>
+</div>
+    
+  </main>
+</body>
+</html>
