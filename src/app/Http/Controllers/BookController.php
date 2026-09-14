@@ -11,7 +11,7 @@ class BookController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         // Eager-load authors, and aggregate the review count/average rating
         // in the same query (withCount/withAvg), rather than loading every
@@ -20,8 +20,10 @@ class BookController extends Controller
         $books = Book::with('authors')
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
+            ->search($request->query('search'))
             ->orderBy('title')
-            ->paginate(12);
+            ->paginate(12)
+            ->withQueryString();
 
         return view('books.index', compact('books'));
     }
