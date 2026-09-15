@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reviewing the test suite — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/polish-and-handoff/confirming-eager-loading-solved-n-plus-1.html">← Confirming eager loading solved N+1</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/polish-and-handoff/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/polish-and-handoff/index.html">Lesson 6: Polish, Test-Suite Review, and Handoff</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Reviewing the test suite</span>
+          
+        
+      </nav>
+    
+
+    <h1>Reviewing the test suite</h1>
+    <p class="lede">A controller-by-controller pass over everything Lessons 1 through 6 have tested so far, turning up one real gap - the my-reviews page has never actually been tested - and closing it with five new tests.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The last topic proved something specific: every read route's query count
+stays flat as its data grows. That's one property, checked on five pages.
+It says nothing about whether the suite as a whole still matches what the
+app actually does - whether every controller action has a test behind it,
+and whether every test that exists is still checking something real. This
+topic is that pass: walk the suite one controller at a time, and close
+whatever turns up.</p>
+<h2>Books and authors: nothing missing</h2>
+<p><code>Tests\Feature\BookTest</code> covers <code>BookController</code> action by action:
+<code>index</code> (the plain list, three search branches, the no-match message, the
+repopulated search box), <code>show</code> (authors and reviews rendered, a 404 for
+a book that doesn't exist), <code>create</code>/<code>store</code> (success, and a missing
+<code>title</code> failing validation with the form repopulated), <code>edit</code>/<code>update</code>
+(the same shape), and <code>destroy</code> (the row gone, and its cover image gone
+from storage with it). <code>Tests\Feature\AuthorTest</code> does the same for
+<code>AuthorController</code>'s two actions, <code>index</code> and <code>show</code> - the only two it
+has, since authors were never given their own create/edit/delete routes.
+Nothing here needs closing; this pass just confirms it.</p>
+<h2>Reviews: one action never got a test at all</h2>
+<p><code>ReviewController</code> has five actions wired to routes: <code>create</code>/<code>store</code>,
+<code>edit</code>/<code>update</code>, <code>destroy</code>, and <code>mine</code>. <code>Tests\Feature\ReviewTest</code>
+covers the first four thoroughly - success, validation failure, the
+duplicate-review guard, and a <code>someoneElse</code> user forbidden from editing,
+updating, or deleting a review they don't own. <code>mine</code> - the page behind
+&quot;My Reviews&quot; in the navigation - has no test in that file at all.</p>
+<p>It isn't completely unexercised. <code>QueryCountTest</code> visits
+<code>route('reviews.mine')</code> twice, at three reviews and at fifteen, and
+asserts the query count came back the same both times. But that test
+only ever creates reviews belonging to the one user it acts as - it
+never checks <em>whose</em> reviews come back, just how many queries it took to
+fetch them. A version of <code>mine()</code> that listed every review in the
+database, not just the logged-in user's own, would pass <code>QueryCountTest</code>
+exactly as well as the real one does. A flat query count and a correct
+result are two different claims, and only one of them has ever been
+tested.</p>
+<h2>Closing the gap</h2>
+<p>Five tests, added to the bottom of <code>Tests\Feature\ReviewTest</code> - the same
+file already covering the rest of <code>ReviewController</code>, since <code>mine()</code>
+belongs to that controller too, not a new one of its own.</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_guests_are_redirected_to_login_from_my_reviews</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.mine&#x27;</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertRedirect</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;login&#x27;</span>, <span class="hljs-attr">absolute</span>: <span class="hljs-literal">false</span>));
+}
+</code></pre>
+<p>The same shape <code>BookTest</code> and <code>AuthorTest</code> both open with - every route
+in the app sits behind <code>auth</code> middleware, and <code>mine()</code> had never had
+this checked either.</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_my_reviews_lists_the_users_own_reviews</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+    <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([
+        <span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id,
+        <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id,
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">5</span>,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;A genuine classic.&#x27;</span>,
+    ]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.mine&#x27;</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;Dune&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;A genuine classic.&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;5 / 5&#x27;</span>);
+}
+</code></pre>
+<p>The baseline claim the page makes at all: a logged-in user's own review
+shows up, with the book it's attached to, its comment, and its rating.
+Nothing here is new as a technique - it's the same <code>assertSee()</code> pattern
+every other index/show test in the suite already uses - which is exactly
+why it's notable that nobody had written it yet.</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_my_reviews_does_not_list_another_users_reviews</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$someoneElse</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;My Book&#x27;</span>])
+        -&gt;<span class="hljs-title function_ invoke__">reviews</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id, <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">4</span>]);
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Someone Elses Book&#x27;</span>])
+        -&gt;<span class="hljs-title function_ invoke__">reviews</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$someoneElse</span>-&gt;id, <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">2</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.mine&#x27;</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;My Book&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertDontSee</span>(<span class="hljs-string">&#x27;Someone Elses Book&#x27;</span>);
+}
+</code></pre>
+<p>This is the one that actually matters, and the one <code>QueryCountTest</code> was
+never in a position to catch: two users, two reviews, and a check that
+each user's page only ever shows their own. <code>assertDontSee()</code> does the
+real work here, the same way it did for search results back in Lesson 5</p>
+<ul>
+<li><code>assertSee('My Book')</code> alone would still pass even if the page leaked
+every review in the database.</li>
+</ul>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_my_reviews_shows_the_most_recently_written_review_first</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$older</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Older Review&#x27;</span>]);
+    <span class="hljs-variable">$newer</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Newer Review&#x27;</span>]);
+    <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([
+        <span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$older</span>-&gt;id,
+        <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id,
+        <span class="hljs-string">&#x27;created_at&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">now</span>()-&gt;<span class="hljs-title function_ invoke__">subDay</span>(),
+    ]);
+    <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([
+        <span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$newer</span>-&gt;id,
+        <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id,
+        <span class="hljs-string">&#x27;created_at&#x27;</span> =&gt; <span class="hljs-title function_ invoke__">now</span>(),
+    ]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.mine&#x27;</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSeeInOrder</span>([<span class="hljs-string">&#x27;Newer Review&#x27;</span>, <span class="hljs-string">&#x27;Older Review&#x27;</span>]);
+}
+</code></pre>
+<p><code>mine()</code>'s own doc comment promises &quot;most recent first&quot; - that's what
+<code>-&gt;latest()</code> is there for - but nothing checked it actually held.
+<code>assertSeeInOrder()</code> is new here: it doesn't just check that both titles
+appear somewhere in the response, it checks that the first one appears
+<em>before</em> the second in the raw HTML, which is exactly what &quot;most recent
+first&quot; means on a rendered page.</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_my_reviews_shows_a_message_when_the_user_has_no_reviews</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;reviews.mine&#x27;</span>));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&quot;You haven&#x27;t reviewed any books yet.&quot;</span>);
+}
+</code></pre>
+<p>The <code>@forelse</code>/<code>@empty</code> branch in <code>reviews/mine.blade.php</code> has had its
+own wording since the page was built - the same kind of exact-text check
+<code>books.index</code>'s &quot;No books match&quot; message got in Lesson 5, now applied to
+the one empty state that had gone unchecked.</p>
+<h2>Proving it: temporarily un-scope the query</h2>
+<p>Same discipline as the last topic - a test that would pass either way
+isn't proving anything. <code>mine()</code> currently reads:</p>
+<pre><code class="hljs language-php"><span class="hljs-variable">$reviews</span> = <span class="hljs-title function_ invoke__">auth</span>()-&gt;<span class="hljs-title function_ invoke__">user</span>()-&gt;<span class="hljs-title function_ invoke__">reviews</span>()
+    -&gt;<span class="hljs-title function_ invoke__">with</span>(<span class="hljs-string">&#x27;book&#x27;</span>)
+    -&gt;<span class="hljs-title function_ invoke__">latest</span>()
+    -&gt;<span class="hljs-title function_ invoke__">paginate</span>(<span class="hljs-number">12</span>);
+</code></pre>
+<p>Swapping <code>auth()-&gt;user()-&gt;reviews()</code> for a plain <code>Review::query()</code> -
+every review in the table, not just the logged-in user's - and rerunning
+just the scoping test:</p>
+<pre><code class="hljs">Not to contain: Someone Elses Book
+</code></pre>
+<p><code>test_my_reviews_does_not_list_another_users_reviews</code> fails immediately,
+exactly as it should. Putting <code>auth()-&gt;user()-&gt;reviews()</code> back drops the
+suite straight back to green - confirmation that this test really is
+watching the one property that matters, not just exercising the route.</p>
+<h2>Running everything</h2>
+<pre><code class="hljs">Tests:    83 passed (200 assertions)
+</code></pre>
+<p>Five new tests, all in <code>Tests\Feature\ReviewTest</code>, alongside everything
+carried over from Lessons 1 through 6.1 - up from 78. Every action on
+every controller in the app now has a test confirming what it actually
+does, not just how many queries it takes to do it.</p>
+<h2>What's next</h2>
+<p>The app is tested end to end, and Part 1 is functionally complete. The
+final topic is a short handoff document - what exists, and what Part 2
+is expected to build on top of it.</p>
+</div>
+    
+  </main>
+</body>
+</html>
