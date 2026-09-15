@@ -146,4 +146,76 @@ class ReviewTest extends TestCase
         $deleteResponse->assertRedirect(route('books.show', $book));
         $this->assertModelMissing($review);
     }
+
+    public function test_guests_are_redirected_to_login_from_my_reviews(): void
+    {
+        $response = $this->get(route('reviews.mine'));
+
+        $response->assertRedirect(route('login', absolute: false));
+    }
+
+    public function test_my_reviews_lists_the_users_own_reviews(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Dune']);
+        Review::factory()->create([
+            'book_id' => $book->id,
+            'user_id' => $user->id,
+            'rating' => 5,
+            'comment' => 'A genuine classic.',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('reviews.mine'));
+
+        $response->assertOk();
+        $response->assertSee('Dune');
+        $response->assertSee('A genuine classic.');
+        $response->assertSee('5 / 5');
+    }
+
+    public function test_my_reviews_does_not_list_another_users_reviews(): void
+    {
+        $user = User::factory()->create();
+        $someoneElse = User::factory()->create();
+        Book::factory()->create(['title' => 'My Book'])
+            ->reviews()->create(['user_id' => $user->id, 'rating' => 4]);
+        Book::factory()->create(['title' => 'Someone Elses Book'])
+            ->reviews()->create(['user_id' => $someoneElse->id, 'rating' => 2]);
+
+        $response = $this->actingAs($user)->get(route('reviews.mine'));
+
+        $response->assertSee('My Book');
+        $response->assertDontSee('Someone Elses Book');
+    }
+
+    public function test_my_reviews_shows_the_most_recently_written_review_first(): void
+    {
+        $user = User::factory()->create();
+        $older = Book::factory()->create(['title' => 'Older Review']);
+        $newer = Book::factory()->create(['title' => 'Newer Review']);
+        Review::factory()->create([
+            'book_id' => $older->id,
+            'user_id' => $user->id,
+            'created_at' => now()->subDay(),
+        ]);
+        Review::factory()->create([
+            'book_id' => $newer->id,
+            'user_id' => $user->id,
+            'created_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('reviews.mine'));
+
+        $response->assertSeeInOrder(['Newer Review', 'Older Review']);
+    }
+
+    public function test_my_reviews_shows_a_message_when_the_user_has_no_reviews(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('reviews.mine'));
+
+        $response->assertOk();
+        $response->assertSee("You haven't reviewed any books yet.");
+    }
 }
