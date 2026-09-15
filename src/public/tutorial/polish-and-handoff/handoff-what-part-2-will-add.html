@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Handoff: what Part 2 will add — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/polish-and-handoff/reviewing-the-test-suite.html">← Reviewing the test suite</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/polish-and-handoff/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/polish-and-handoff/index.html">Lesson 6: Polish, Test-Suite Review, and Handoff</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Handoff: what Part 2 will add</span>
+          
+        
+      </nav>
+    
+
+    <h1>Handoff: what Part 2 will add</h1>
+    <p class="lede">What six weeks of Book Reviews actually built, and a scoped, deliberate exception to this course&#39;s own no-forward-references rule: a preview of the role-based authorization Part 2 picks up from here.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Every topic so far has stuck to one rule without exception: nothing gets
+used before it's been taught. This one breaks it, on purpose, for one
+paragraph at a time - previewing two things a different instructor
+builds on top of this app in the six weeks after this one. It's flagged
+here, explicitly, because that rule matters everywhere else in this
+course; this closing topic is the one deliberate, bounded exception to
+it, not a crack in it.</p>
+<h2>What exists</h2>
+<p>A logged-in user can browse a catalogue of books - searchable by title,
+author, or year - see each book's authors and existing reviews, and
+leave exactly one review per book, with a rating and an optional
+comment. They can edit or delete their own reviews from a dedicated &quot;My
+Reviews&quot; page, but nobody else's. Authors have their own browsable
+list, each showing the books attributed to them. Every one of those
+routes sits behind Breeze's real session-based login, not a stub. All
+of it is backed by 83 tests, and every read page runs a flat number of
+database queries regardless of how much data sits behind it - proven,
+not assumed. That's the whole of Part 1: a real, working, fully tested
+book review catalogue, with nothing missing from what it claims to do.</p>
+<p>What it deliberately doesn't do yet is anything role-based. Every
+registered user has exactly the same permissions as every other one -
+there's no &quot;admin&quot; who can edit someone else's book, no moderator who
+can remove someone else's review. That gap was named on purpose, all
+the way back in this course's very first lesson, as a boundary for what
+six weeks could reasonably cover - not a gap anyone was meant to quietly
+work around. This is where it picks back up.</p>
+<h2>Role-based authorization: <code>users.role</code></h2>
+<p>Nothing in this app currently reads a role, so nothing in its schema
+declares one - a column with no code path exercising it would just be a
+forward reference sitting in the database with nothing pointing at it
+yet. Part 2 adds it the same way every other column in this app arrived:
+its own migration, added when it's actually needed, not stubbed out
+early &quot;to save a step.&quot; Once it exists, it's what everything below
+actually checks.</p>
+<h2>Policies: the framework's real answer to the Lesson 4 stand-in</h2>
+<p><code>ReviewController</code> currently guards <code>edit()</code>, <code>update()</code>, and <code>destroy()</code>
+with a private method:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">private</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">authorizeOwner</span>(<span class="hljs-params">Review <span class="hljs-variable">$review</span></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-keyword">if</span> (<span class="hljs-variable">$review</span>-&gt;user_id !== <span class="hljs-title function_ invoke__">auth</span>()-&gt;<span class="hljs-title function_ invoke__">id</span>()) {
+        <span class="hljs-title function_ invoke__">abort</span>(<span class="hljs-number">403</span>);
+    }
+}
+</code></pre>
+<p>That was flagged as a stand-in the day it was written - a plain,
+honest guard clause standing in for a <strong>Policy</strong>, Laravel's actual
+dedicated mechanism for &quot;can this user do this to this model?&quot; A Policy
+is a class the framework already knows how to find - <code>php artisan make:policy ReviewPolicy --model=Review</code> generates one wired to <code>Review</code>
+by naming convention alone - with one method per action:</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ReviewPolicy</span>
+</span>{
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">update</span>(<span class="hljs-params">User <span class="hljs-variable">$user</span>, Review <span class="hljs-variable">$review</span></span>): <span class="hljs-title">bool</span>
+    </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-variable">$user</span>-&gt;id === <span class="hljs-variable">$review</span>-&gt;user_id;
+    }
+}
+</code></pre>
+<p>Once that exists, the controller stops checking ownership itself and
+just asks:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">update</span>(<span class="hljs-params">Request <span class="hljs-variable">$request</span>, Review <span class="hljs-variable">$review</span></span>)
+</span>{
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">authorize</span>(<span class="hljs-string">&#x27;update&#x27;</span>, <span class="hljs-variable">$review</span>);
+    <span class="hljs-comment">// ...</span>
+}
+</code></pre>
+<p>Read that as a sketch, not a build - this app's own <code>authorizeOwner()</code>
+is untouched, still doing exactly what it's always done. But the two
+methods above say the same thing: &quot;only the review's own author may
+update it.&quot; <code>authorizeOwner()</code> said it as a hand-written <code>if</code>. A Policy
+says it as a class Laravel calls for you, the same relationship
+Eloquent models have to hand-written SQL, or <code>$request-&gt;validate()</code> has
+to a hand-written validator class - a familiar shape, a framework
+provided version. Once <code>users.role</code> exists too, the same Policy method
+is exactly where a role check would go: <code>$user-&gt;role === 'admin' || $user-&gt;id === $review-&gt;user_id</code>, one extra condition, the same method,
+the same pattern - a moderator allowed to remove anyone's review without
+Book Reviews' access-control logic scattering itself back out across
+controllers to get there.</p>
+<h2>A lower-priority extension point: <code>editions</code></h2>
+<p>One more deliberate simplification is worth naming, though it's a
+smaller thing to pick up than authorization and nothing about it is
+expected to happen soon: <code>books</code> currently carries <code>isbn</code>, <code>publisher</code>,
+<code>price</code>, and <code>edition_number</code> directly on itself, so every book has
+exactly one implicit edition. A real catalogue might let one book have
+many editions - different printings, different ISBNs, different prices</p>
+<ul>
+<li>as a proper one-to-many relationship instead. Nothing about the data
+those four columns hold would be lost splitting them back out; it's a
+clean, well-understood extension point if it's ever worth the extra
+model, migration, and pair of controllers it would take - not a bug
+being carried forward.</li>
+</ul>
+<h2>Part 1 complete</h2>
+<p>Six lessons: a schema and Eloquent models with real authentication in
+Lesson 1, seeded demo data and read-only browsing in Lesson 2, full CRUD
+for the book catalogue in Lesson 3, reviews with an ownership check in
+Lesson 4, search across title, author, and year in Lesson 5, and this
+closing pass confirming the query performance and test coverage both
+hold up under real scrutiny. What started as a bare <code>laravel new .</code>
+install is now a working application with nothing hidden behind it -
+every route tested, every page's query count measured and proven flat,
+and exactly two things - a role, and the Policy that reads it - left
+for the next six weeks to build.</p>
+</div>
+    
+  </main>
+</body>
+</html>
