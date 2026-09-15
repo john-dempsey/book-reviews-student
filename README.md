@@ -19,6 +19,15 @@ environment used elsewhere in CC-Y1-WebDev. The Laravel app lives in
 
 ## First-time setup
 
+**Windows only:** before cloning, run `git config --global core.autocrlf input`
+(or `false`). With the default `core.autocrlf=true`, git checks shell
+scripts out with CRLF line endings, which corrupts `docker/apache-php/entrypoint.sh`'s
+shebang line and makes `apache-php-container` fail to start with
+`exec /usr/local/bin/entrypoint.sh: no such file or directory`. This repo's
+`.gitattributes` prevents that going forward, but only for commits made
+after it was added — checking out an older lesson/topic tag still needs
+this git config set first.
+
 1. `docker compose up -d --build`
 2. Open a shell in the workspace container: `docker compose exec workspace-container bash`
 3. Inside that shell, from `/var/www/html` (already the working dir):
