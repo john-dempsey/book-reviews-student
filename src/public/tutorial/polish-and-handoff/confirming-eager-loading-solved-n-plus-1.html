@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirming eager loading solved N+1 — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/search/testing-search.html">← Testing search</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/polish-and-handoff/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/polish-and-handoff/index.html">Lesson 6: Polish, Test-Suite Review, and Handoff</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Confirming eager loading solved N+1</span>
+          
+        
+      </nav>
+    
+
+    <h1>Confirming eager loading solved N+1</h1>
+    <p class="lede">Every controller since Lesson 2 chose to eager-load its relationships rather than let Blade fetch them lazily - this topic writes the regression test that confirms that decision actually paid off, and looks at what eager loading trades away to get there.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Every read route in this app - the catalogue, a single book, the author
+list, a single author, a user's own reviews - has quietly made the same
+choice since Lesson 2: load whatever a page's relationships are going to
+need up front, in one extra query, rather than letting Blade fetch them
+one row at a time as it renders. <code>BookController@index</code>'s own comment
+has called this out by name since the day it was written - &quot;avoids the
+N+1 problem.&quot; This topic doesn't introduce that decision; it confirms
+it actually worked, with a test that would fail the day it stopped being
+true, instead of a comment nobody's checking.</p>
+<h2>Eager loading vs. lazy loading</h2>
+<p>Eloquent can fetch a related model two ways, and the difference between
+them is the entire reason this topic has anything to prove.</p>
+<p><strong>Lazy loading</strong> is the default: a relationship defined on a model
+(<code>Book::authors()</code>, say) fetches nothing until something actually reads
+it. <code>$book-&gt;authors</code> runs a query the first time it's touched, and not
+before - fine, even ideal, for a single model loaded once, like
+<code>books.show</code>'s own <code>$book</code>. The same access pattern inside a loop over
+many rows is a different story: <code>@foreach ($books as $book)</code> touching
+<code>$book-&gt;authors</code> once per iteration runs once query per book, on top of
+the one that fetched the books themselves - the N+1 pattern this app has
+spent five lessons deliberately avoiding.</p>
+<p><strong>Eager loading</strong> front-loads the same relationship for every row a
+listing is about to render, in one extra query, run exactly once no
+matter how many rows are on the page: <code>Book::with('authors')</code> for a
+fresh query, <code>$book-&gt;load('authors')</code> for a model already fetched. That
+one choice, made consistently since Lesson 2, is the reason this app
+has no N+1 queries left to find.</p>
+<p>Neither approach is simply better - it's a real trade-off:</p>
+<ul>
+<li><strong>Eager loading's advantages</strong>: a flat, predictable query count no
+matter how many rows are on the page - the exact property this
+topic's tests check for - and fewer round trips to the database
+overall, which usually costs more real-world latency than the number
+of rows those round trips return.</li>
+<li><strong>Eager loading's disadvantages</strong>: it has to be told in advance
+exactly what a view is going to need. A Blade template that starts
+touching a new relationship later needs its controller updated to
+match, or the N+1 this app has avoided so carefully creeps straight
+back in - precisely the regression <code>QueryCountTest</code> exists to catch.
+It can also over-fetch: <code>books.show</code>'s <code>$book-&gt;reviews-&gt;avg('rating')</code>
+pulls every one of a book's review rows into memory just to average
+them in PHP, rather than asking the database for the average
+directly the way <code>withAvg()</code> already does on the catalogue listing.</li>
+<li><strong>Lazy loading's advantages</strong>: nothing has to be predicted ahead of
+time, and a relationship only costs a query at all if the page
+actually ends up using it - for a single model touched once, that's
+not a real cost either way, and it's simpler to write.</li>
+<li><strong>Lazy loading's disadvantages</strong>: the moment that same access happens
+inside a loop over many rows, &quot;only costs a query if used&quot; becomes
+&quot;costs one query per row,&quot; and nothing about the code itself changes
+to show it - <code>$book-&gt;authors</code> reads identically whether <code>$book</code> came
+from a loop of one or a loop of a thousand. The bug is invisible at
+the call site; it only shows up as a page that quietly gets slower as
+the catalogue grows.</li>
+</ul>
+<h2>Counting queries in a test</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">private</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">countQueries</span>(<span class="hljs-params"><span class="hljs-keyword">callable</span> <span class="hljs-variable">$fn</span></span>): <span class="hljs-title">int</span>
+</span>{
+    DB::<span class="hljs-title function_ invoke__">enableQueryLog</span>();
+    DB::<span class="hljs-title function_ invoke__">flushQueryLog</span>();
+
+    <span class="hljs-variable">$fn</span>();
+
+    <span class="hljs-variable">$count</span> = <span class="hljs-title function_ invoke__">count</span>(DB::<span class="hljs-title function_ invoke__">getQueryLog</span>());
+    DB::<span class="hljs-title function_ invoke__">disableQueryLog</span>();
+
+    <span class="hljs-keyword">return</span> <span class="hljs-variable">$count</span>;
+}
+</code></pre>
+<p><code>DB::enableQueryLog()</code> turns on a running list of every query Laravel
+sends to the database; <code>flushQueryLog()</code> empties whatever's already in
+it, so the count that follows only reflects <code>$fn()</code>'s own queries, not
+anything left over from setting up the test. <code>getQueryLog()</code> returns
+that list - <code>count()</code> on it is the number this test actually cares
+about. Wrapping the whole sequence in a reusable private method matters
+here for the same reason <code>scopeSearch()</code> mattered in Lesson 5: every
+test below needs this exact sequence, and writing it once means getting
+it right once.</p>
+<h2>The test that matters: scale it up and compare</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_books_index_page_runs_the_same_number_of_queries_regardless_of_catalogue_size</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">seedBooks</span>(<span class="hljs-number">3</span>);
+    <span class="hljs-variable">$withThreeBooks</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">countQueries</span>(fn () =&gt; <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>)));
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">seedBooks</span>(<span class="hljs-number">12</span>); <span class="hljs-comment">// 15 books total now</span>
+    <span class="hljs-variable">$withFifteenBooks</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">countQueries</span>(fn () =&gt; <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>)));
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-variable">$withThreeBooks</span>, <span class="hljs-variable">$withFifteenBooks</span>);
+}
+</code></pre>
+<p><code>seedBooks()</code> is a private helper that creates however many books it's
+asked for, each attached to two shared authors and given two reviews -
+enough relationships hanging off each book that a lazy-loaded N+1
+anywhere in the chain would show up. The test then visits <code>books.index</code>
+twice, once at three books and once at fifteen, and asserts the query
+count came back <em>the same both times</em>. No number is hardcoded anywhere
+in the assertion - deliberately. Writing <code>$this-&gt;assertSame(3, $withThreeBooks)</code> would also pass today, but it would just as surely
+start failing the day someone adds one entirely legitimate new query to
+the page (a feature flag lookup, another aggregate), for a reason that
+has nothing to do with eager loading at all. Comparing two scales
+against each other, instead of against a fixed number, tests the actual
+property eager loading promises - flat against catalogue size - without
+being fragile to everything else.</p>
+<p>Four more tests repeat the exact same shape, one per remaining read
+route, each varying whatever quantity would expose that page's own
+possible N+1: <code>books.show</code> compares a book with three reviews against
+one with fifteen, <code>authors.index</code> compares three authors against
+fifteen, <code>authors.show</code> compares one author with three books against
+one with fifteen, and <code>reviews.mine</code> compares a user with three reviews
+against one with fifteen. All five live together in one new file,
+<code>Tests\Feature\QueryCountTest</code> - this is the first test class in the
+course that isn't about one entity's own controller, so it gets a file
+of its own rather than joining <code>BookTest</code>, <code>AuthorTest</code>, or <code>ReviewTest</code>.</p>
+<h2>Proving the test itself is real</h2>
+<p>A test that always passes is worth exactly as much as no test at all.
+Before trusting this one, it's worth switching <code>BookController@index</code>
+back to lazy loading on purpose - removing <code>Book::with('authors')</code> - and
+watching the test actually fail:</p>
+<pre><code class="hljs">Failed asserting that 14 is identical to 5.
+</code></pre>
+<p>Three books rendered with <code>authors</code> left to load lazily cost 5 queries
+(2 to paginate, plus one lazy <code>authors</code> query per book on the page);
+fifteen books - only twelve of which fit on <code>paginate(12)</code>'s first page</p>
+<ul>
+<li>cost 14 (the same 2, plus one per <em>visible</em> book, not per book in the
+whole catalogue). Putting <code>with('authors')</code> back drops both numbers
+straight back to a flat 3, matching every other read page in this app.
+That's the failure this test exists to catch - not today, since nothing
+here is actually broken, but the day a future change quietly swaps
+eager loading back out for the lazy default and nobody happens to
+notice a page got a little slower.</li>
+</ul>
+<h2>Running everything</h2>
+<pre><code class="hljs">Tests:    78 passed (189 assertions)
+</code></pre>
+<p>Five new tests, all in the new <code>QueryCountTest</code>, alongside everything
+carried over from Lessons 1 through 5. Every read page this app has now
+has a test confirming eager loading kept its promise - a flat query
+count regardless of how much data sits behind the page - not just a
+comment claiming it does.</p>
+<h2>What's next</h2>
+<p>The eager-loading decision is proven; the rest of the test suite hasn't
+had the same scrutiny yet. The next topic reviews it end to end - every
+entity, every controller - and closes whatever real gaps turn up.</p>
+</div>
+    
+  </main>
+</body>
+</html>
