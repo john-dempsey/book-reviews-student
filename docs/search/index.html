@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lesson 5: Search — Book Reviews Tutorial</title>
-  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
-  <link rel="stylesheet" href="/tutorial/assets/style.css">
+  <link rel="stylesheet" href="assets/hljs-theme.css">
+  <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <nav class="site-nav">
     <div class="site-nav-inner">
       <div class="nav-slot nav-slot-left">
-        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+        <a class="nav-home" href="index.html" aria-label="Home">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 11 12 3l9 8" />
@@ -21,7 +21,7 @@
         
       </div>
       <div class="nav-slot nav-slot-center">
-        <a class="nav-up" href="/tutorial/index.html">↑ Up</a>
+        <a class="nav-up" href="index.html">↑ Up</a>
       </div>
       <div class="nav-slot nav-slot-right">
         
@@ -33,7 +33,7 @@
     
       <nav class="breadcrumb" aria-label="Breadcrumb">
         
-          <a href="/tutorial/index.html">Home</a>
+          <a href="index.html">Home</a>
           <span class="breadcrumb-sep">/</span>
         
           <span aria-current="page">Lesson 5: Search</span>
@@ -49,17 +49,17 @@
       <ul class="listing">
         
           <li>
-            <a href="/tutorial/search/basic-search-by-title.html">Basic search by title</a>
+            <a href="search/basic-search-by-title.html">Basic search by title</a>
             <p>A search box on books.index, backed by a query scope on Book - the first reusable, chainable piece of query logic this app has written on a model itself, plus withQueryString() to keep a search term alive across pagination links.</p>
           </li>
         
           <li>
-            <a href="/tutorial/search/search-by-author-and-year.html">Author, year, and the limits of LIKE</a>
+            <a href="search/search-by-author-and-year.html">Author, year, and the limits of LIKE</a>
             <p>Widening scopeSearch() to also match an author&#39;s name and a book&#39;s year - orWhereHas(), a grouped where() closure to keep the OR conditions from leaking into the rest of the query, and a short look at what LIKE can&#39;t do.</p>
           </li>
         
           <li>
-            <a href="/tutorial/search/testing-search.html">Testing search</a>
+            <a href="search/testing-search.html">Testing search</a>
             <p>Feature tests proving the search box actually narrows the catalogue by title, author, and year, plus unit tests locking scopeSearch()&#39;s three matching branches - and the non-matching and blank-term cases - down directly on the model.</p>
           </li>
         
