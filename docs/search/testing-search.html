@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testing search — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/search/search-by-author-and-year.html">← Author, year, and the limits of LIKE</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/search/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/polish-and-handoff/confirming-eager-loading-solved-n-plus-1.html">Confirming eager loading solved N+1 →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/search/index.html">Lesson 5: Search</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Testing search</span>
+          
+        
+      </nav>
+    
+
+    <h1>Testing search</h1>
+    <p class="lede">Feature tests proving the search box actually narrows the catalogue by title, author, and year, plus unit tests locking scopeSearch()&#39;s three matching branches - and the non-matching and blank-term cases - down directly on the model.</p>
+
+    
+
+    
+      <div class="topic-body"><p>Search has only ever been checked by hand so far: type something into
+the box, look at what comes back. This topic closes that gap the same
+way the last lesson's final topic did for reviews - tests for
+<code>scopeSearch()</code> itself, and tests for the route that actually uses it.</p>
+<h2>The scope, tested directly</h2>
+<p><code>Tests\Unit\BookTest</code> already covers <code>Book</code>'s factory, its relationships,
+and its own attributes. <code>scopeSearch()</code> is model logic too, so it
+belongs in the same file, called the same way topic 5.2's tinker session
+called it - directly on the model, no HTTP involved:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_search_scope_matches_a_books_title_an_authors_name_or_its_year</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>, <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-number">1965</span>]);
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">authors</span>()-&gt;<span class="hljs-title function_ invoke__">attach</span>(<span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;name&#x27;</span> =&gt; <span class="hljs-string">&#x27;Frank Herbert&#x27;</span>]));
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertTrue</span>(<span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">search</span>(<span class="hljs-string">&#x27;Dune&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">exists</span>());
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertTrue</span>(<span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">search</span>(<span class="hljs-string">&#x27;Herbert&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">exists</span>());
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertTrue</span>(<span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">search</span>(<span class="hljs-string">&#x27;1965&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">exists</span>());
+}
+</code></pre>
+<p><code>Book::search('Dune')</code> is the same static-call shorthand Eloquent scopes
+have supported since topic 5.1 - it reads as if <code>search()</code> were a real
+method on <code>Book</code> itself, though <code>scopeSearch()</code> is what actually runs.
+<code>exists()</code> is new: it asks the database &quot;does at least one row match this
+query&quot; without pulling any of them back, the cheapest possible way to
+check a scope actually narrowed things down to something rather than
+nothing. One book, three searches, three branches of the same
+<code>where(function ...) { ... }</code> closure from topic 5.2 - title, author, and
+year all proven to reach the same row.</p>
+<p>Proving a match works isn't the whole claim a search makes, though - a
+search that matched <em>everything</em> would pass the test above too:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_search_scope_finds_nothing_for_a_non_matching_term</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>, <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-number">1965</span>]);
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertFalse</span>(<span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">search</span>(<span class="hljs-string">&#x27;zzz&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">exists</span>());
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_search_scope_with_a_blank_term_returns_every_book</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">count</span>(<span class="hljs-number">3</span>)-&gt;<span class="hljs-title function_ invoke__">create</span>();
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">3</span>, <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">search</span>(<span class="hljs-literal">null</span>)-&gt;<span class="hljs-title function_ invoke__">count</span>());
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">3</span>, <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">search</span>(<span class="hljs-string">&#x27;&#x27;</span>)-&gt;<span class="hljs-title function_ invoke__">count</span>());
+}
+</code></pre>
+<p>The first proves a term that matches nothing really does come back
+empty - the missing half of &quot;search works&quot; that only checking matches
+would let slip past unnoticed. The second locks down the guard both
+topics 5.1 and 5.2 built the whole scope around: <code>null</code> (no <code>search</code> key
+in the query string at all) and <code>''</code> (the box submitted empty) both have
+to leave every book visible, not narrow the catalogue down to zero. That
+guard has been true since topic 5.1's very first version of
+<code>scopeSearch()</code> - this is the first time anything actually checks it.</p>
+<h2>The route, tested through a real request</h2>
+<p><code>Tests\Feature\BookTest</code> already has a request-level test for
+<code>books.index</code> from Lesson 2's testing topic - listing books with no
+search at all. Four more prove the search box itself, one per matching
+branch and one for the miss:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_index_page_search_matches_a_books_title</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Some Other Title&#x27;</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>, [<span class="hljs-string">&#x27;search&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;Dune&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertDontSee</span>(<span class="hljs-string">&#x27;Some Other Title&#x27;</span>);
+}
+</code></pre>
+<p><code>route('books.index', ['search' =&gt; 'Dune'])</code> builds <code>/books?search=Dune</code>
+directly - the same URL submitting the form produces, without a browser
+in the way. <code>assertDontSee()</code> is the half <code>test_the_index_page_lists_books</code>
+back in Lesson 2 never needed and this test does: proof that the <em>other</em>
+book, the one that shouldn't match, actually disappeared from the page
+rather than just happening not to be checked for. <code>assertSee()</code> alone
+would still pass if <code>search</code> silently did nothing at all.</p>
+<p>Author and year repeat the same shape, over the two branches topic 5.2
+added:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_index_page_search_matches_an_authors_name</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">authors</span>()-&gt;<span class="hljs-title function_ invoke__">attach</span>(<span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;name&#x27;</span> =&gt; <span class="hljs-string">&#x27;Frank Herbert&#x27;</span>]));
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Some Other Title&#x27;</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>, [<span class="hljs-string">&#x27;search&#x27;</span> =&gt; <span class="hljs-string">&#x27;Herbert&#x27;</span>]));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;Dune&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertDontSee</span>(<span class="hljs-string">&#x27;Some Other Title&#x27;</span>);
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_index_page_search_matches_a_year</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>, <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-number">1965</span>]);
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Some Other Title&#x27;</span>, <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-number">1999</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>, [<span class="hljs-string">&#x27;search&#x27;</span> =&gt; <span class="hljs-string">&#x27;1965&#x27;</span>]));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;Dune&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertDontSee</span>(<span class="hljs-string">&#x27;Some Other Title&#x27;</span>);
+}
+</code></pre>
+<p>Neither test asserts anything about <code>scopeSearch()</code> directly - from the
+route's side, all that matters is that the right book ends up on the
+page and the wrong one doesn't. The unit tests above already cover <em>why</em>
+that happens; these prove the whole request/response cycle actually
+delivers it.</p>
+<h2>The empty state, and the box that remembers what you typed</h2>
+<p>Two more small claims from topics 5.1 and 5.2, each easy to break
+without a test noticing:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_index_page_shows_a_message_for_a_non_matching_search</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>, [<span class="hljs-string">&#x27;search&#x27;</span> =&gt; <span class="hljs-string">&#x27;zzz&#x27;</span>]));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertOk</span>();
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertDontSee</span>(<span class="hljs-string">&#x27;Dune&#x27;</span>);
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;No books match &quot;zzz&quot;.&#x27;</span>);
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_the_search_box_repopulates_with_the_current_search_term</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$user</span> = <span class="hljs-title class_">User</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>();
+    <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">factory</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]);
+
+    <span class="hljs-variable">$response</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">actingAs</span>(<span class="hljs-variable">$user</span>)-&gt;<span class="hljs-title function_ invoke__">get</span>(<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.index&#x27;</span>, [<span class="hljs-string">&#x27;search&#x27;</span> =&gt; <span class="hljs-string">&#x27;Dune&#x27;</span>]));
+
+    <span class="hljs-variable">$response</span>-&gt;<span class="hljs-title function_ invoke__">assertSee</span>(<span class="hljs-string">&#x27;value=&quot;Dune&quot;&#x27;</span>, <span class="hljs-literal">false</span>);
+}
+</code></pre>
+<p><code>assertSee('No books match &quot;zzz&quot;.')</code> checks the exact wording
+<code>books/index.blade.php</code>'s <code>@forelse</code>/<code>@empty</code> branch chose specifically
+for a search with no results - proof the view actually tells the two
+empty states apart, not just that <em>some</em> message shows up. The second
+test's <code>false</code> argument turns off <code>assertSee()</code>'s default HTML-escaping
+of the text being searched for - needed here because the assertion is
+checking for a literal HTML attribute (<code>value=&quot;Dune&quot;</code>), not text a
+person reading the page would see, and <code>value=&quot;Dune&quot;</code> written into a
+test as plain text would otherwise get escaped into something that
+never actually appears in the response.</p>
+<h2>Running everything</h2>
+<pre><code class="hljs">Tests:    73 passed (184 assertions)
+</code></pre>
+<p>Eight new tests - three in <code>Unit\BookTest</code>, five in <code>Feature\BookTest</code> -
+alongside everything carried over from Lessons 1 through 4. Every branch
+<code>scopeSearch()</code> can take, matching or not, and every page the search box
+actually renders, now checked on every future change instead of by
+retyping the same few searches into a browser by hand.</p>
+<h2>Lesson 5 complete</h2>
+<p>A book can now be found by title, author, or year, without paging
+through the whole catalogue to spot it - and every one of those three
+paths, plus the two it deliberately doesn't cover yet, is proven by a
+test rather than a memory of what happened last time it was tried by
+hand. Lesson 6 closes out Part 1: a refactor pass over the N+1 queries
+these controllers have quietly accumulated since Lesson 2, a full
+review of the test suite built across all five lessons, and a short
+handoff document for whatever Part 2 builds on top of this.</p>
+</div>
+    
+  </main>
+</body>
+</html>

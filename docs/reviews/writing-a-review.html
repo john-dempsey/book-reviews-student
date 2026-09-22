@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Writing a review — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/full-crud-for-books/testing-the-full-crud-flow.html">← Testing the full CRUD flow</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/reviews/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/reviews/editing-and-deleting-your-own-review.html">Editing and deleting your own review →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/reviews/index.html">Lesson 4: Reviews</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Writing a review</span>
+          
+        
+      </nav>
+    
+
+    <h1>Writing a review</h1>
+    <p class="lede">ReviewController@create and @store behind this course&#39;s first nested resource route, rating/comment validation, and turning the migration&#39;s unique index into a friendly redirect instead of a raw duplicate-entry error.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The catalogue itself is finished - a book can be added, edited, and
+removed, each step validated. Nothing has actually let anyone leave a
+<em>review</em> yet, though - every review on a book's page so far arrived
+through a seeder, the same way every book once did before Lesson 3. This
+topic adds the first way to change that: a form for reviewing a book,
+and the controller code that saves what it submits.</p>
+<h2>A route nested under its book</h2>
+<p>Every route so far - <code>books</code>, <code>authors</code> - has stood on its own. A review
+never makes sense without a book to belong to, and this is the first
+route in the app that says so directly:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;books.reviews&#x27;</span>, <span class="hljs-title class_">ReviewController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;create&#x27;</span>, <span class="hljs-string">&#x27;store&#x27;</span>]);
+</code></pre>
+<p><code>Route::resource('books.reviews', ...)</code> is <code>Route::resource('books', ...)</code>
+with one more segment - <code>books.reviews</code> reads as &quot;reviews, nested under
+books.&quot; It generates <code>GET /books/{book}/reviews/create</code>, named
+<code>books.reviews.create</code>, and <code>POST /books/{book}/reviews</code>, named
+<code>books.reviews.store</code> - the URL itself carries which book a review is
+being written for, rather than a review needing its own standalone
+<code>/reviews/create</code> with a hidden book-picker field. <code>-&gt;only(['create', 'store'])</code> is exactly the familiar restriction from every resource route
+in this app so far - editing and deleting a review are a later topic's
+job, not this one's.</p>
+<h2><code>ReviewController@create</code>: showing the form</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">create</span>(<span class="hljs-params">Book <span class="hljs-variable">$book</span></span>)
+</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;reviews.create&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;book&#x27;</span>));
+}
+</code></pre>
+<p>Route model binding does the same job it always has, just reading
+<code>{book}</code> out of a longer URL than usual - <code>books/{book}/reviews/create</code>
+still resolves straight to a <code>Book $book</code> parameter, no lookup written
+by hand. The view needs that book both to know which one it's reviewing
+and to build the form's own submit URL.</p>
+<h2>The form: a <code>&lt;select&gt;</code>, and <code>@selected</code></h2>
+<p><code>rating</code> is naturally a small, fixed set of choices rather than free
+text - a dropdown fits better here than the text inputs every form so
+far has used:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">select</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;rating&quot;</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;rating&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm&quot;</span> <span class="hljs-attr">required</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">option</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;&quot;</span>&gt;</span>{{ __(&#x27;Select a rating&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">option</span>&gt;</span>
+    @for ($i = 1; $i &lt;= 5; $i++)
+        <span class="hljs-tag">&lt;<span class="hljs-name">option</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{ $i }}&quot;</span> @<span class="hljs-attr">selected</span>(<span class="hljs-attr">old</span>(&#x27;<span class="hljs-attr">rating</span>&#x27;) == <span class="hljs-string">$i)</span>&gt;</span>{{ $i }} / 5<span class="hljs-tag">&lt;/<span class="hljs-name">option</span>&gt;</span>
+    @endfor
+<span class="hljs-tag">&lt;/<span class="hljs-name">select</span>&gt;</span>
+<span class="hljs-tag">&lt;<span class="hljs-name">x-input-error</span> <span class="hljs-attr">:messages</span>=<span class="hljs-string">&quot;$errors-&gt;get(&#x27;rating&#x27;)&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;mt-2&quot;</span> /&gt;</span>
+</code></pre>
+<p><code>@for</code> builds the five options the same way a plain PHP <code>for</code> loop
+would. <code>@selected(...)</code> is new, but small: it prints the <code>selected</code>
+attribute when its condition is true, and prints nothing at all when
+it's false - <code>@selected(old('rating') == $i)</code> is the exact same
+<code>old()</code>-driven repopulation idea from topic 3.2, just applied to a
+<code>&lt;select&gt;</code> instead of a text input's <code>value=&quot;&quot;</code>. <code>comment</code> needs nothing
+new at all - the same <code>&lt;textarea&gt;</code> and <code>old()</code> pattern topic 3.3 already
+used for a book's description.</p>
+<h2><code>ReviewController@store</code>: the two things worth checking</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">store</span>(<span class="hljs-params">Request <span class="hljs-variable">$request</span>, Book <span class="hljs-variable">$book</span></span>)
+</span>{
+    <span class="hljs-variable">$validated</span> = <span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">validate</span>([
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-string">&#x27;required|integer|between:1,5&#x27;</span>,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string&#x27;</span>,
+    ]);
+</code></pre>
+<p>Nothing here is new - <code>required</code>, <code>nullable</code>, <code>integer</code> have all
+appeared already; <code>between:1,5</code> is the same bounding idea as <code>max:255</code>,
+just checking both ends of a range instead of one. A failure behaves
+exactly as it has since topic 3.2: redirected straight back to the form,
+with a message under <code>rating</code> and whatever was already typed still
+there.</p>
+<h2>One review per person per book</h2>
+<p>A rating and a comment aren't the only thing worth checking. Back in
+Lesson 1, the <code>reviews</code> migration added a unique index on <code>[book_id, user_id]</code> - the database itself already refuses a second row for the
+same pair. Leave the check out of the controller entirely, and
+reviewing a book twice looks like this instead:</p>
+<pre><code class="hljs">SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry
+&#x27;82-56&#x27; for key &#x27;reviews.reviews_book_id_user_id_unique&#x27;
+</code></pre>
+<p>The same shape of problem topic 3.1 hit with a blank <code>title</code> - a real
+constraint doing exactly its job, and a raw database exception the
+wrong way for any user to find that out. The fix here isn't
+<code>$request-&gt;validate()</code> again, though - nothing about <em>what</em> was typed
+into the form was wrong, so there's no rule string that catches it.
+This is a check against the rest of the database, not against the
+request:</p>
+<pre><code class="hljs language-php">    <span class="hljs-comment">// The migration&#x27;s unique index already stops a second row for this</span>
+    <span class="hljs-comment">// exact pair existing - this check exists so trying anyway gets the</span>
+    <span class="hljs-comment">// same friendly redirect-back-with-errors treatment as any other</span>
+    <span class="hljs-comment">// validation failure, rather than the raw exception above reaching</span>
+    <span class="hljs-comment">// the browser.</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">reviews</span>()-&gt;<span class="hljs-title function_ invoke__">where</span>(<span class="hljs-string">&#x27;user_id&#x27;</span>, <span class="hljs-title function_ invoke__">auth</span>()-&gt;<span class="hljs-title function_ invoke__">id</span>())-&gt;<span class="hljs-title function_ invoke__">exists</span>()) {
+        <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">back</span>()-&gt;<span class="hljs-title function_ invoke__">withErrors</span>([
+            <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-string">&#x27;You have already reviewed this book.&#x27;</span>,
+        ])-&gt;<span class="hljs-title function_ invoke__">withInput</span>();
+    }
+
+    <span class="hljs-variable">$validated</span>[<span class="hljs-string">&#x27;user_id&#x27;</span>] = <span class="hljs-title function_ invoke__">auth</span>()-&gt;<span class="hljs-title function_ invoke__">id</span>();
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">reviews</span>()-&gt;<span class="hljs-title function_ invoke__">create</span>(<span class="hljs-variable">$validated</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">redirect</span>()-&gt;<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>);
+}
+</code></pre>
+<p><code>$book-&gt;reviews()-&gt;where('user_id', auth()-&gt;id())-&gt;exists()</code> asks the
+same question the unique index enforces, just before the <code>INSERT</code>
+happens instead of after: does a review from this user already exist on
+this book? <code>back()-&gt;withErrors([...])-&gt;withInput()</code> is the exact same
+shape <code>validate()</code>'s own automatic failure builds - a real message,
+attached to a real field, on a redirect back to the form - written out
+by hand this one time because the thing that failed isn't a rule
+<code>validate()</code> knows how to check on its own. <code>auth()-&gt;id()</code> is new here,
+though the idea isn't: every form so far has trusted values the request
+carried in; which user is submitting isn't one of them - trusting a
+hidden <code>user_id</code> field would let anyone claim to be anyone. <code>auth()-&gt;id()</code>
+reads it from the actual logged-in session instead, the same session
+<code>actingAs()</code> and Breeze's login have relied on all along, and it's
+attached to <code>$validated</code> the same way an uploaded image's path already
+gets attached to <code>$validated['image']</code> in <code>BookController</code>.</p>
+<h2>Trying it out</h2>
+<p><code>books/show.blade.php</code>'s &quot;Reviews&quot; heading gets a &quot;Write a Review&quot;
+button next to it, pointing at <code>route('books.reviews.create', $book)</code>.
+Fill in a rating and submit, and the review appears on the book's page
+immediately, right alongside the seeded ones - and the average rating
+and review count next to &quot;Reviews&quot; already update to include it, with
+no new code anywhere: that number was already being computed from
+whatever rows exist, from the moment topic 2.3 built the show page.</p>
+<p>Try reviewing the same book a second time, and the friendly version of
+the error above shows up instead - &quot;You have already reviewed this
+book,&quot; the rating dropdown reset to blank, back on the same form. What's
+still missing is a way to fix a review once it's written, or take it
+back entirely - that's next topic's job.</p>
+</div>
+    
+  </main>
+</body>
+</html>

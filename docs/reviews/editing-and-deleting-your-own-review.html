@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editing and deleting your own review — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/reviews/writing-a-review.html">← Writing a review</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/reviews/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/reviews/my-reviews.html">My reviews →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/reviews/index.html">Lesson 4: Reviews</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Editing and deleting your own review</span>
+          
+        
+      </nav>
+    
+
+    <h1>Editing and deleting your own review</h1>
+    <p class="lede">A flat reviews/{review} route alongside the nested one, a shared form partial, and the manual abort(403) ownership check guarding edit, update, and destroy alike - a deliberate stand-in for the Policy class Part 2 introduces.</p>
+
+    
+
+    
+      <div class="topic-body"><p>A review can be written now, but not fixed or taken back - the only way
+to change your mind about a book so far is to email the lecturer. This
+topic finishes the review half of CRUD: editing and deleting a review
+you wrote, and refusing to let anyone touch a review that isn't theirs.</p>
+<h2>A second route, flat this time</h2>
+<p>Last topic's route needed a book in the URL because creating a review
+only makes sense in the context of one. Editing or deleting an
+<em>existing</em> review doesn't have that problem - the review already knows
+which book it belongs to - so this one drops the nesting:</p>
+<pre><code class="hljs language-php"><span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;books.reviews&#x27;</span>, <span class="hljs-title class_">ReviewController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;create&#x27;</span>, <span class="hljs-string">&#x27;store&#x27;</span>]);
+
+<span class="hljs-title class_">Route</span>::<span class="hljs-title function_ invoke__">resource</span>(<span class="hljs-string">&#x27;reviews&#x27;</span>, <span class="hljs-title class_">ReviewController</span>::<span class="hljs-variable language_">class</span>)-&gt;<span class="hljs-title function_ invoke__">only</span>([<span class="hljs-string">&#x27;edit&#x27;</span>, <span class="hljs-string">&#x27;update&#x27;</span>, <span class="hljs-string">&#x27;destroy&#x27;</span>]);
+</code></pre>
+<p>Same controller, two separate <code>Route::resource()</code> calls - nothing stops
+one controller from answering to more than one resource route, and
+nothing requires every route touching reviews to nest the same way.
+<code>edit</code> and <code>update</code> resolve to <code>GET /reviews/{review}/edit</code> and <code>PUT /reviews/{review}</code>, named <code>reviews.edit</code>/<code>reviews.update</code> - directly
+parallel to <code>books.edit</code>/<code>books.update</code> from topic 3.3, just on a
+<code>Review</code> instead of a <code>Book</code>. <code>destroy</code> is the familiar <code>DELETE /reviews/{review}</code> from topic 3.4's playbook, applied here.</p>
+<h2>The ownership check: <code>abort(403)</code></h2>
+<p>Nothing so far has stopped any logged-in user from typing
+<code>/reviews/1/edit</code> into the address bar, whoever wrote review 1. Every
+one of the three new methods needs the same answer to the same
+question - <em>is this actually your review?</em> - so it's worth writing
+once:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">private</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">authorizeOwner</span>(<span class="hljs-params">Review <span class="hljs-variable">$review</span></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-keyword">if</span> (<span class="hljs-variable">$review</span>-&gt;user_id !== <span class="hljs-title function_ invoke__">auth</span>()-&gt;<span class="hljs-title function_ invoke__">id</span>()) {
+        <span class="hljs-title function_ invoke__">abort</span>(<span class="hljs-number">403</span>);
+    }
+}
+</code></pre>
+<p><code>abort(403)</code> is new: it stops the request immediately and renders
+Laravel's built-in &quot;403 Forbidden&quot; error page, the same way a
+nonexistent <code>{book}</code> already renders a 404 automatically via route
+model binding - except this time nothing about the URL was wrong, only
+who's asking. <code>$review-&gt;user_id !== auth()-&gt;id()</code> asks the same &quot;who is
+this, really&quot; question topic 4.1's <code>store()</code> already asked when it set
+<code>user_id</code> from <code>auth()-&gt;id()</code> instead of trusting a submitted field -
+that was about not letting a request <em>claim</em> to be someone; this is
+about not letting a request <em>act on someone else's row</em>. Every one of
+<code>edit()</code>, <code>update()</code>, and <code>destroy()</code> starts by calling it:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">edit</span>(<span class="hljs-params">Review <span class="hljs-variable">$review</span></span>)
+</span>{
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">authorizeOwner</span>(<span class="hljs-variable">$review</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">view</span>(<span class="hljs-string">&#x27;reviews.edit&#x27;</span>, <span class="hljs-title function_ invoke__">compact</span>(<span class="hljs-string">&#x27;review&#x27;</span>));
+}
+</code></pre>
+<p>This is worth being honest about: Laravel has a proper, built-in tool
+for exactly this job, called a <strong>Policy</strong> - a class dedicated to
+answering &quot;can this user do this to this model?&quot; that the framework
+knows how to call automatically. It isn't used here on purpose, not
+because it's unknown yet by accident. Reaching for it now would teach
+that later topic ahead of itself; <code>abort(403)</code> behind a private method
+is a plain, honest stand-in until then - you're about to meet the
+framework's proper way of doing this, later.</p>
+<h2>One more small reuse: <code>validationRules()</code></h2>
+<p><code>update()</code> needs to check the same rating/comment rules <code>store()</code>
+already checks - a review still has to make sense the second time it's
+saved, not just the first. <code>BookController</code> solved this exact problem
+in topic 3.3 with a private <code>validationRules()</code> method shared between
+<code>store()</code> and <code>update()</code>; the same fix applies here:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">private</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">validationRules</span>(<span class="hljs-params"></span>): <span class="hljs-title">array</span>
+</span>{
+    <span class="hljs-keyword">return</span> [
+        <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-string">&#x27;required|integer|between:1,5&#x27;</span>,
+        <span class="hljs-string">&#x27;comment&#x27;</span> =&gt; <span class="hljs-string">&#x27;nullable|string&#x27;</span>,
+    ];
+}
+</code></pre>
+<p><code>store()</code> from last topic is updated to call
+<code>$request-&gt;validate($this-&gt;validationRules())</code> instead of repeating the
+two rule strings inline, and <code>update()</code> calls the exact same thing:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">update</span>(<span class="hljs-params">Request <span class="hljs-variable">$request</span>, Review <span class="hljs-variable">$review</span></span>)
+</span>{
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">authorizeOwner</span>(<span class="hljs-variable">$review</span>);
+
+    <span class="hljs-variable">$review</span>-&gt;<span class="hljs-title function_ invoke__">update</span>(<span class="hljs-variable">$request</span>-&gt;<span class="hljs-title function_ invoke__">validate</span>(<span class="hljs-variable">$this</span>-&gt;<span class="hljs-title function_ invoke__">validationRules</span>()));
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">redirect</span>()-&gt;<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$review</span>-&gt;book);
+}
+</code></pre>
+<p><code>$review-&gt;update(...)</code> is the same method <code>books/edit.blade.php</code>'s
+<code>update()</code> already calls on a <code>Book</code> - Eloquent's <code>update()</code> works the
+same way on any model, given an array of already-validated fields.
+<code>redirect()-&gt;route('books.show', $review-&gt;book)</code> reads the book back
+off the relationship rather than needing it passed in separately - the
+review already knows which book it belongs to, so nothing about this
+route needs <code>{book}</code> in its URL at all.</p>
+<h2><code>destroy()</code>: read the relationship before it's gone</h2>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">destroy</span>(<span class="hljs-params">Review <span class="hljs-variable">$review</span></span>)
+</span>{
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">authorizeOwner</span>(<span class="hljs-variable">$review</span>);
+
+    <span class="hljs-variable">$book</span> = <span class="hljs-variable">$review</span>-&gt;book;
+    <span class="hljs-variable">$review</span>-&gt;<span class="hljs-title function_ invoke__">delete</span>();
+
+    <span class="hljs-keyword">return</span> <span class="hljs-title function_ invoke__">redirect</span>()-&gt;<span class="hljs-title function_ invoke__">route</span>(<span class="hljs-string">&#x27;books.show&#x27;</span>, <span class="hljs-variable">$book</span>);
+}
+</code></pre>
+<p>The one new wrinkle, compared to topic 3.4's <code>BookController@destroy</code>:
+<code>$review-&gt;book</code> has to be read into a local variable <em>before</em>
+<code>$review-&gt;delete()</code> runs. Once the row is gone, so is the foreign key
+that made <code>$review-&gt;book</code> resolvable at all - reading it after
+<code>delete()</code> would return nothing, and there'd be nowhere left to
+redirect to.</p>
+<h2>One shared form partial, same idea as <code>books</code></h2>
+<p><code>reviews/create.blade.php</code> had its own copy of the rating <code>&lt;select&gt;</code>
+and comment <code>&lt;textarea&gt;</code> from last topic; <code>reviews/edit.blade.php</code> would
+need the exact same markup, just pre-filled. Rather than maintaining two
+copies, both share one partial - the same fix <code>books/partials/form.blade.php</code>
+already applied to <code>books.create</code>/<code>books.edit</code>:</p>
+<pre><code class="hljs language-html">{{-- Shared between create.blade.php and edit.blade.php. $review is only set
+     when editing - old(&#x27;field&#x27;, $review-&gt;field ?? &#x27;&#x27;) falls back to the
+     review&#x27;s current value there, or to an empty string on create, and to
+     whatever was just typed in on either page if validation just failed. --}}
+<span class="hljs-tag">&lt;<span class="hljs-name">select</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;rating&quot;</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;rating&quot;</span> <span class="hljs-attr">...</span> <span class="hljs-attr">required</span>&gt;</span>
+    <span class="hljs-tag">&lt;<span class="hljs-name">option</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;&quot;</span>&gt;</span>{{ __(&#x27;Select a rating&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">option</span>&gt;</span>
+    @for ($i = 1; $i &lt;= 5; $i++)
+        <span class="hljs-tag">&lt;<span class="hljs-name">option</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{ $i }}&quot;</span> @<span class="hljs-attr">selected</span>(<span class="hljs-attr">old</span>(&#x27;<span class="hljs-attr">rating</span>&#x27;, $<span class="hljs-attr">review-</span>&gt;</span>rating ?? &#x27;&#x27;) == $i)&gt;{{ $i }} / 5<span class="hljs-tag">&lt;/<span class="hljs-name">option</span>&gt;</span>
+    @endfor
+<span class="hljs-tag">&lt;/<span class="hljs-name">select</span>&gt;</span>
+</code></pre>
+<p>The only change from last topic's version is <code>old('rating', $review-&gt;rating ?? '')</code>
+instead of bare <code>old('rating')</code> - <code>$review</code> doesn't exist when the
+partial is included from <code>create.blade.php</code>, so <code>$review-&gt;rating ?? ''</code>
+quietly falls back to an empty string there, exactly the same fallback
+<code>books/partials/form.blade.php</code> already relies on for a book's <code>title</code>.
+<code>create.blade.php</code> now just includes it:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;books.reviews.store&#x27;, $book) }}&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;space-y-6&quot;</span>&gt;</span>
+    @csrf
+
+    @include(&#x27;reviews.partials.form&#x27;)
+<span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+</code></pre>
+<p>and <code>reviews/edit.blade.php</code> includes the same partial, passing <code>$review</code>
+in, with the familiar <code>@method('PUT')</code> spoofing a request browsers can't
+send natively:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;reviews.update&#x27;, $review) }}&quot;</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;space-y-6&quot;</span>&gt;</span>
+    @csrf
+    @method(&#x27;PUT&#x27;)
+
+    @include(&#x27;reviews.partials.form&#x27;, [&#x27;review&#x27; =&gt; $review])
+<span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+</code></pre>
+<h2>Showing the controls to their owner, and no one else</h2>
+<p><code>reviews/partials/review.blade.php</code> - the partial <code>books/show.blade.php</code>
+already loops over to print every review on a book - gets an &quot;Edit&quot; link
+and a &quot;Delete&quot; button, but only for the review's own author:</p>
+<pre><code class="hljs language-html">@if ($review-&gt;user_id === auth()-&gt;id())
+    <span class="hljs-tag">&lt;<span class="hljs-name">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string">&quot;flex items-center gap-3&quot;</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">a</span> <span class="hljs-attr">href</span>=<span class="hljs-string">&quot;{{ route(&#x27;reviews.edit&#x27;, $review) }}&quot;</span>&gt;</span>{{ __(&#x27;Edit&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">a</span>&gt;</span>
+
+        <span class="hljs-tag">&lt;<span class="hljs-name">form</span> <span class="hljs-attr">method</span>=<span class="hljs-string">&quot;POST&quot;</span> <span class="hljs-attr">action</span>=<span class="hljs-string">&quot;{{ route(&#x27;reviews.destroy&#x27;, $review) }}&quot;</span>
+              <span class="hljs-attr">onsubmit</span>=<span class="hljs-string">&quot;return confirm(&#x27;Delete this review? This cannot be undone.&#x27;);&quot;</span>&gt;</span>
+            @csrf
+            @method(&#x27;DELETE&#x27;)
+            <span class="hljs-tag">&lt;<span class="hljs-name">button</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;submit&quot;</span>&gt;</span>{{ __(&#x27;Delete&#x27;) }}<span class="hljs-tag">&lt;/<span class="hljs-name">button</span>&gt;</span>
+        <span class="hljs-tag">&lt;/<span class="hljs-name">form</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">div</span>&gt;</span>
+@endif
+</code></pre>
+<p>This <code>@if</code> is a convenience for the person looking at the page, nothing
+more - it hides a button someone else's request would fail anyway, the
+same relationship <code>$review-&gt;user_id === auth()-&gt;id()</code> checks that
+<code>authorizeOwner()</code> checks on the server. Hiding the button changes
+nothing about what's actually allowed; skip it entirely and someone
+could still type <code>/reviews/1/edit</code> into the address bar by hand and get
+turned away by the exact same <code>abort(403)</code>. The delete <code>&lt;form&gt;</code> reuses
+topic 3.4's <code>confirm()</code>-guarded <code>DELETE</code>-spoofing pattern exactly - same
+<code>@method('DELETE')</code>, same &quot;this cannot be undone&quot; wording, just on a
+review instead of a book.</p>
+<h2>Trying it out</h2>
+<p>Open a book you've reviewed, and &quot;Edit&quot; and &quot;Delete&quot; now sit next to
+your own review - change the rating, save, and the book page reflects
+it immediately, average included. Every other review on the same page,
+written by someone else, shows neither button at all.</p>
+<p>Try reaching <code>/reviews/{id}/edit</code> directly for a review that isn't
+yours - typing the URL in by hand, not clicking anything the page
+offers - and the response is a 403, Laravel's own &quot;Forbidden&quot; page,
+before the edit form is ever rendered. The same thing happens sending a
+<code>PUT</code> or <code>DELETE</code> straight to <code>/reviews/{id}</code> for someone else's review,
+with no button involved at all - the check runs in the controller, not
+the browser, so nothing about hiding a link is what's actually keeping
+anyone out.</p>
+<p>Between the two review topics, the app can now do everything a reviewer
+needs: write one, fix it, or take it back, always as yourself and never
+as anyone else. What's still missing is a single place to see every
+review <em>you've</em> written, across every book at once - that's next
+topic's job.</p>
+</div>
+    
+  </main>
+</body>
+</html>

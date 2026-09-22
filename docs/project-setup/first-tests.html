@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>First tests: models — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/project-setup/eloquent-models-and-relationships.html">← Eloquent models and relationships</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/project-setup/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/seeding-and-browsing/writing-factories.html">Writing factories →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/project-setup/index.html">Lesson 1: Project Setup, Schema &amp; Authentication</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">First tests: models</span>
+          
+        
+      </nav>
+    
+
+    <h1>First tests: models</h1>
+    <p class="lede">PHPUnit basics, how Laravel keeps tests from touching real data, and the first real tests against Book, Author, and Review.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The last topic's closing section promised this moment: an actual schema,
+actual models, actual relationships — finally something worth testing.
+This topic covers PHPUnit itself (you haven't used it before), how
+Laravel keeps a test from quietly corrupting real data, and this
+project's first real tests.</p>
+<h2>What PHPUnit actually is</h2>
+<p>PHPUnit is the testing framework Laravel ships with by default. A test is
+just a method, on a class extending <code>Tests\TestCase</code>, whose name starts
+with <code>test_</code>:</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">BookTest</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">TestCase</span>
+</span>{
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_book_can_be_created</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+    </span>{
+        <span class="hljs-comment">// ...</span>
+    }
+}
+</code></pre>
+<p>Inside that method, you do something, then assert what should be true
+afterward — <code>assertTrue()</code>, <code>assertCount()</code>, and Laravel's own
+database-aware assertions like <code>assertDatabaseHas()</code>, which you'll see
+below. <code>php artisan test</code> — already familiar from running the suite after
+every topic so far — is what actually runs every method like this one, in
+every file under <code>tests/</code>, and reports which passed.</p>
+<h2>The database problem, and how it's solved here</h2>
+<p>A test that creates a <code>Book</code> has to hit a real database to do it — so
+what stops ten new test runs a day from filling <code>book_reviews</code> with junk
+titled &quot;Test Book&quot;? Three real options exist:</p>
+<ol>
+<li><strong>Point tests at a separate, disposable database</strong> — its own name, its
+own connection settings, wiped and rebuilt as often as you like,
+completely independent of the data you're actually browsing in
+phpMyAdmin.</li>
+<li><strong>Run tests against an in-memory SQLite database</strong> instead of MySQL —
+this is actually what a fresh <code>laravel new</code> project is configured to
+do out of the box. Fast, and automatically thrown away, but a
+genuinely different database engine from the one this app actually
+runs on — not a risk for every test, but the kind of gap that can let
+a MySQL-specific detail go untested.</li>
+<li><strong>Run tests against the exact same database the app uses</strong>, relying on
+something else to stop any of it from sticking.</li>
+</ol>
+<p>This project uses option 3 — the same <code>book_reviews</code> MySQL database your
+own browsing uses — via a trait called <code>RefreshDatabase</code>:</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">BookTest</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">TestCase</span>
+</span>{
+    <span class="hljs-keyword">use</span> <span class="hljs-title">RefreshDatabase</span>;
+
+    <span class="hljs-comment">// ...</span>
+}
+</code></pre>
+<p><code>RefreshDatabase</code> wraps <strong>each test method</strong> in a database transaction,
+and rolls that transaction back the moment the test method ends. Every
+<code>Book::create()</code> inside a test really does run a real <code>INSERT</code>, against
+the real database — the assertions in that same test genuinely see it.
+It just never <em>commits</em>. Proof, from a real test run: a test creating one
+<code>Book</code> and asserting <code>assertDatabaseCount('books', 1)</code> — which passes —
+followed immediately by querying <code>book_reviews</code> directly, outside the
+test, for the same count:</p>
+<pre><code class="hljs">books_in_real_db
+0
+</code></pre>
+<p>Whatever ran inside the test is simply gone once it ends, like it never
+happened — which is exactly the property you want.</p>
+<h2>Writing the first tests</h2>
+<p><code>tests/Unit/BookTest.php</code>, <code>AuthorTest.php</code>, and <code>ReviewTest.php</code> cover
+the three models from the last topic, one file each — following the same
+<code>tests/Unit/</code> vs. <code>tests/Feature/</code> split mentioned back when the <code>tests/</code>
+folder was still empty. Each test builds its own rows directly
+(<code>Book::create([...])</code>, <code>User::create([...])</code>) rather than through a
+factory — there still isn't one yet; that's Lesson 2.</p>
+<p><strong>A model can actually be created:</strong></p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_book_can_be_created</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">create</span>([
+        <span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;The Pragmatic Programmer&#x27;</span>,
+        <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-number">1999</span>,
+    ]);
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertDatabaseHas</span>(<span class="hljs-string">&#x27;books&#x27;</span>, [<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;The Pragmatic Programmer&#x27;</span>]);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertSame</span>(<span class="hljs-number">1999</span>, <span class="hljs-variable">$book</span>-&gt;year);
+}
+</code></pre>
+<p><code>assertDatabaseHas()</code> is Laravel's own assertion, on top of PHPUnit's —
+it runs a real query and fails if no row matches. Reading it as SQL, it's
+asserting exactly <code>SELECT * FROM books WHERE title = '...'</code> found
+something.</p>
+<p><strong>A relationship actually resolves:</strong></p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_book_has_many_authors</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;title&#x27;</span> =&gt; <span class="hljs-string">&#x27;Clean Code&#x27;</span>, <span class="hljs-string">&#x27;year&#x27;</span> =&gt; <span class="hljs-number">2008</span>]);
+    <span class="hljs-variable">$author</span> = <span class="hljs-title class_">Author</span>::<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;name&#x27;</span> =&gt; <span class="hljs-string">&#x27;Robert C. Martin&#x27;</span>]);
+
+    <span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">authors</span>()-&gt;<span class="hljs-title function_ invoke__">attach</span>(<span class="hljs-variable">$author</span>);
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertCount</span>(<span class="hljs-number">1</span>, <span class="hljs-variable">$book</span>-&gt;authors);
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">assertTrue</span>(<span class="hljs-variable">$book</span>-&gt;authors-&gt;<span class="hljs-title function_ invoke__">first</span>()-&gt;<span class="hljs-title function_ invoke__">is</span>(<span class="hljs-variable">$author</span>));
+}
+</code></pre>
+<p><code>-&gt;is($author)</code> is Eloquent's way of asking &quot;is this literally the same
+row&quot; — comparing two model instances by class and primary key, rather
+than comparing every attribute by hand.</p>
+<p><strong>A business rule actually holds</strong>, not just the schema's shape — this is
+the one test expecting a failure, deliberately:</p>
+<pre><code class="hljs language-php"><span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">test_a_user_cannot_review_the_same_book_twice</span>(<span class="hljs-params"></span>): <span class="hljs-title">void</span>
+</span>{
+    <span class="hljs-variable">$book</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">makeBook</span>();
+    <span class="hljs-variable">$user</span> = <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">makeUser</span>();
+
+    <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id, <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id, <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">5</span>]);
+
+    <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">expectException</span>(<span class="hljs-title class_">UniqueConstraintViolationException</span>::<span class="hljs-variable language_">class</span>);
+
+    <span class="hljs-title class_">Review</span>::<span class="hljs-title function_ invoke__">create</span>([<span class="hljs-string">&#x27;book_id&#x27;</span> =&gt; <span class="hljs-variable">$book</span>-&gt;id, <span class="hljs-string">&#x27;user_id&#x27;</span> =&gt; <span class="hljs-variable">$user</span>-&gt;id, <span class="hljs-string">&#x27;rating&#x27;</span> =&gt; <span class="hljs-number">1</span>]);
+}
+</code></pre>
+<p><code>expectException()</code> tells PHPUnit, <em>before</em> the risky line runs, exactly
+which exception the next line should throw — the test only passes if
+that second <code>create()</code> actually fails, proving the unique index from the
+migrations topic is really being enforced by the database, not just
+assumed to be there.</p>
+<p>Between the three files, every relationship from the last topic gets
+exercised at least once, in both directions: <code>Book::authors()</code> /
+<code>Author::books()</code>, <code>Book::reviews()</code> / <code>User::reviews()</code>, and
+<code>Review::book()</code> / <code>Review::user()</code>.</p>
+<h2>Running them</h2>
+<p>Nothing new here — <code>php artisan test</code>, same as every topic so far, now
+reports real coverage instead of just Breeze's own generated tests:</p>
+<pre><code class="hljs">PASS  Tests\Unit\AuthorTest
+✓ an author can be created
+✓ an author has many books
+
+PASS  Tests\Unit\BookTest
+✓ a book can be created
+✓ a book has many authors
+✓ a book has many reviews
+
+PASS  Tests\Unit\ReviewTest
+✓ a review can be created
+✓ a review belongs to a book
+✓ a review belongs to a user
+✓ a user can have many reviews
+✓ a user cannot review the same book twice
+</code></pre>
+<p><code>--filter=BookTest</code> narrows a run to one class, or one test, by name —
+worth knowing once a suite has grown past a handful of files, rather than
+re-running everything for a one-line change.</p>
+<p>This closes out Lesson 1: a schema, models, relationships, and now tests
+proving all three actually hold together. Lesson 2 picks up from here
+with factories, seeders, and the first real pages for browsing the
+catalogue.</p>
+</div>
+    
+  </main>
+</body>
+</html>

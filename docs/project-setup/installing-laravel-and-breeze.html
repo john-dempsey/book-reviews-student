@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Installing Laravel and Breeze — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/project-setup/laravel-application-structure.html">← The Laravel application structure</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/project-setup/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/project-setup/migrations.html">Migrations: users, books, authors, author_book, reviews →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/project-setup/index.html">Lesson 1: Project Setup, Schema &amp; Authentication</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Installing Laravel and Breeze</span>
+          
+        
+      </nav>
+    
+
+    <h1>Installing Laravel and Breeze</h1>
+    <p class="lede">Composer and npm, Vite and asset bundling, and installing Laravel Breeze&#39;s Blade stack for real authentication.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The bare install has no way to register or log in yet — that's the first
+thing this lesson actually adds. Getting there means meeting two tools
+you haven't used before: <strong>Composer</strong> (PHP's package manager) and <strong>npm</strong>
+(JavaScript's). Both are already running quietly in the background of
+every <code>composer install</code>/<code>npm run build</code> you've typed so far; this topic
+is where they start doing visible work.</p>
+<h2>Composer: PHP's package manager</h2>
+<p>Laravel itself, and everything it depends on, arrived in <code>src/</code> as
+Composer packages — you saw <code>vendor/</code> get populated by <code>composer install</code>
+during first-time setup. <code>composer.json</code> is the list of packages a
+project depends on, by name and version constraint:</p>
+<pre><code class="hljs language-json"><span class="hljs-attr">&quot;require&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;php&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;^8.2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;laravel/framework&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;^12.0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;laravel/tinker&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;^2.10.1&quot;</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<p><code>composer install</code> reads a second file, <code>composer.lock</code>, and installs the
+<em>exact</em> versions it records — that's what makes first-time setup
+reproducible across machines. <code>composer update</code> is different: it re-reads
+<code>composer.json</code>'s version constraints, works out the newest versions that
+still satisfy them, and rewrites <code>composer.lock</code> to match. Adding a
+brand-new package — which is what installing Breeze means — always goes
+through <code>update</code>, since there's nothing in the lock file for a package
+that isn't in <code>composer.json</code> yet.</p>
+<h2>npm, Vite, and why there's a build step at all</h2>
+<p><code>package.json</code> is Composer's JavaScript equivalent — a list of JS
+packages, read by <code>npm install</code>. The bare install already lists a few:
+Tailwind CSS (for styling) and Vite (the build tool). Browsers can't run
+Tailwind's utility classes or your <code>.css</code>/<code>.js</code> source files directly the
+way they are on disk — they need <strong>bundling</strong>: resolving imports,
+compiling Tailwind's classes into plain CSS, and writing the result to
+<code>public/build/</code> as a handful of hashed files a Blade view pulls in with
+one <code>@vite(...)</code> directive. Vite is the tool that does that bundling.</p>
+<p>Two npm scripts matter, both already defined in <code>package.json</code>:</p>
+<ul>
+<li><code>npm run build</code> — one-shot, produces the optimized files that actually
+ship. This is what first-time setup ran, and what you'll re-run any time
+you want a fresh production bundle.</li>
+<li><code>npm run dev</code> — starts Vite in watch mode instead: it stays running,
+rebuilding automatically as you edit CSS/JS, and the browser picks up
+the change without a manual reload. You won't need this yet — it
+matters once you're actively editing views — but it's worth knowing it
+exists, since <code>compose.yaml</code> already exposes the port it runs on
+(<code>5173</code>) for exactly that purpose.</li>
+</ul>
+<h2>The starter kit this project didn't install</h2>
+<p><code>laravel new</code> (the command that created <code>src/</code> before this lesson) asks
+which <strong>starter kit</strong> to scaffold in, alongside the questions covered in
+the last topic. A starter kit is a ready-made authentication setup —
+registration, login, and a starting frontend stack — installed in the
+same step as the framework itself. This project answered <strong>None</strong>,
+deliberately: every starter kit <code>laravel new</code> currently offers builds on
+Inertia (React, Vue, or Livewire), wiring up an SPA-shaped frontend this
+course isn't using.</p>
+<p>Skipping the prompt doesn't mean skipping authentication — it means
+installing it separately, afterward, from a stack that fits this course:
+<strong>Laravel Breeze</strong>.</p>
+<h2>Installing Breeze</h2>
+<p>Breeze isn't part of the starter-kit prompt above; it's an ordinary
+Composer package, added like any other:</p>
+<pre><code class="hljs">composer require laravel/breeze --dev
+</code></pre>
+<p><code>--dev</code> marks it a development-only dependency — Breeze <em>generates</em> auth
+code into your app once, it isn't something the running app loads at
+request time, so it has no business shipping to a production install
+the way <code>laravel/framework</code> does. Breeze's own installer then does the
+actual scaffolding, and takes one argument: which frontend stack to
+generate:</p>
+<pre><code class="hljs">php artisan breeze:install blade
+</code></pre>
+<p><code>blade</code> is the stack this app uses throughout — plain Blade views and
+controllers, no Inertia, matching the &quot;None&quot; choice above. (Breeze also
+offers <code>react</code>, <code>vue</code>, and <code>api</code> stacks; not used here.) That one command
+generated the auth routes, views, and controller, then ran <code>npm install</code>
+and <code>npm run build</code> on its own, so the styled result is ready to view
+immediately.</p>
+<h2>What actually landed</h2>
+<ul>
+<li><code>routes/auth.php</code> — registration, login, logout, and password-reset
+routes, <code>require</code>d from the bottom of <code>routes/web.php</code>.</li>
+<li><code>resources/views/auth/</code> — a Blade view per route above; <code>dashboard.blade.php</code>
+and <code>resources/views/profile/</code> for a logged-in user's own account page.</li>
+<li><code>app/Http/Controllers/Auth/</code> and <code>ProfileController.php</code> — the
+controllers those routes call.</li>
+<li><code>tests/Feature/Auth/</code> and <code>ProfileTest.php</code> — Breeze ships its own
+feature tests for every route it just generated.</li>
+</ul>
+<p>Nothing about the database changed — Breeze's Blade stack reuses the
+<code>users</code> migration <code>laravel new</code> already created, so there's nothing new
+to migrate here. One smaller, purely cosmetic change is worth naming so it
+doesn't look like a mistake later: Breeze's installer replaced the bare
+install's Tailwind v4 setup (a plugin in <code>vite.config.js</code>, configured via
+an <code>@theme</code> block in <code>app.css</code> itself) with the older <code>tailwind.config.js</code></p>
+<ul>
+<li><code>postcss.config.js</code> pair and Tailwind v3 — Breeze's Blade stack still
+targets that setup. Both are Tailwind; only the configuration shape
+differs.</li>
+</ul>
+<p>None of this touches authoriz<em>ation</em> — who's allowed to do what. Breeze
+only answers <em>who's logged in</em>, the same distinction raised at the start
+of this lesson.</p>
+<h2>Checking it worked</h2>
+<p>http://localhost:8080/register and http://localhost:8080/login now render
+real, styled forms instead of 404s, and registering an account redirects
+straight to <code>/dashboard</code> — a route <code>routes/web.php</code> protects with
+<code>-&gt;middleware(['auth', 'verified'])</code>, so it's reachable only once you're
+actually logged in. <code>php artisan test</code> is worth re-running here too:
+Breeze's own auth tests join the suite, and everything should still pass
+with no schema changes required.</p>
+</div>
+    
+  </main>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 2: Seeding &amp; Browsing the Catalogue — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Lesson 2: Seeding &amp; Browsing the Catalogue</span>
+          
+        
+      </nav>
+    
+
+    <h1>Lesson 2: Seeding &amp; Browsing the Catalogue</h1>
+    <p class="lede">Real factories and seeders producing a believable demo catalogue, then read-only routes for browsing it - and the tests that prove both work.</p>
+
+    
+      <ul class="listing">
+        
+          <li>
+            <a href="/tutorial/seeding-and-browsing/writing-factories.html">Writing factories</a>
+            <p>One factory per model - AuthorFactory, BookFactory, ReviewFactory - and the HasFactory trait that turns each model into something that can conjure realistic-looking rows on demand.</p>
+          </li>
+        
+          <li>
+            <a href="/tutorial/seeding-and-browsing/seeders-and-demo-data.html">Seeders and demo data</a>
+            <p>Turning last topic&#39;s ad hoc factory calls into a repeatable command that builds a whole believable catalogue in one go - one seeder per model, wired together in an order that matters, and the ReviewFactory default that has to be worked around to make it happen.</p>
+          </li>
+        
+          <li>
+            <a href="/tutorial/seeding-and-browsing/reading-the-catalogue.html">Reading the catalogue: index and show</a>
+            <p>BookController and AuthorController&#39;s read-only index/show actions, wired to real routes with route model binding - then the Blade layout, partials, and loops that turn seeded rows into an actual catalogue you can click through.</p>
+          </li>
+        
+          <li>
+            <a href="/tutorial/seeding-and-browsing/testing-the-read-only-routes.html">Testing the read-only routes</a>
+            <p>Proving the factories and seeder still behave as documented, then this project&#39;s first feature tests - real HTTP requests against books.index/show and authors.index/show, checking the response the way a browser actually would.</p>
+          </li>
+        
+      </ul>
+    
+
+    
+  </main>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eloquent models and relationships — Book Reviews Tutorial</title>
+  <link rel="stylesheet" href="/tutorial/assets/hljs-theme.css">
+  <link rel="stylesheet" href="/tutorial/assets/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav-inner">
+      <div class="nav-slot nav-slot-left">
+        <a class="nav-home" href="/tutorial/index.html" aria-label="Home">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11 12 3l9 8" />
+            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+          </svg>
+        </a>
+        <a class="nav-prev" href="/tutorial/project-setup/migrations.html">← Migrations: users, books, authors, author_book, reviews</a>
+      </div>
+      <div class="nav-slot nav-slot-center">
+        <a class="nav-up" href="/tutorial/project-setup/index.html">↑ Up</a>
+      </div>
+      <div class="nav-slot nav-slot-right">
+        <a class="nav-next" href="/tutorial/project-setup/first-tests.html">First tests: models →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+    
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        
+          <a href="/tutorial/index.html">Home</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <a href="/tutorial/project-setup/index.html">Lesson 1: Project Setup, Schema &amp; Authentication</a>
+          <span class="breadcrumb-sep">/</span>
+        
+          <span aria-current="page">Eloquent models and relationships</span>
+          
+        
+      </nav>
+    
+
+    <h1>Eloquent models and relationships</h1>
+    <p class="lede">Book, Author, and Review as Eloquent models - mass assignment, and the belongsToMany/hasMany/belongsTo relationship methods that tie them together.</p>
+
+    
+
+    
+      <div class="topic-body"><p>The four tables from the last topic are just tables so far — nothing in
+<code>src/</code> yet turns a row in <code>books</code> into an object you can work with in PHP.
+That's what this topic adds: a Model class per table (<code>author_book</code>
+doesn't get one — it's a pivot table, not a thing on its own), plus the
+relationship methods that let you move between them.</p>
+<h2>This should look familiar</h2>
+<p>Your Active Record classes from the prior module already do the two
+things a model is for: wrap one row as an object, and know how to load
+and save its own data. If yours looked roughly like this —</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Book</span> </span>{
+    <span class="hljs-keyword">public</span> <span class="hljs-built_in">static</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">find</span>(<span class="hljs-params"><span class="hljs-variable">$id</span></span>) </span>{ <span class="hljs-comment">/* run a SELECT, build a Book */</span> }
+    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">save</span>(<span class="hljs-params"></span>) </span>{ <span class="hljs-comment">/* run an INSERT or UPDATE */</span> }
+}
+
+<span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">find</span>(<span class="hljs-number">3</span>);
+</code></pre>
+<p>— an Eloquent model is the same idea, framework-provided:</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Book</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Model</span> </span>{}
+
+<span class="hljs-variable">$book</span> = <span class="hljs-title class_">Book</span>::<span class="hljs-title function_ invoke__">find</span>(<span class="hljs-number">3</span>);
+</code></pre>
+<p><code>php artisan make:model Book</code> just generated that second class — an empty
+body extending <code>Model</code>. Everything else (<code>find</code>, <code>save</code>, <code>create</code>, and
+more) comes free from the parent class. Eloquent still has to work out
+<em>which</em> table a <code>Book</code> reads from, and it does that by convention rather
+than configuration: the class name, lowercased and pluralized —
+<code>Book</code> → <code>books</code>, <code>Author</code> → <code>authors</code> — matching the table names from
+the last topic exactly because nothing about them was chosen to be
+awkward.</p>
+<h2>Mass assignment: one thing that isn't free</h2>
+<p>The very first thing worth trying — <code>Book::create(['title' =&gt; '...', 'year' =&gt; 1999])</code> —
+actually fails on a freshly generated model:</p>
+<pre><code class="hljs">Illuminate\Database\Eloquent\MassAssignmentException
+Add [title] to fillable property to allow mass assignment on [App\Models\Book].
+</code></pre>
+<p>Eloquent won't let an array of arbitrary keys become column values unless
+a model explicitly says which attributes that's allowed for — the same
+instinct behind validating and sanitizing form input by hand in the prior
+module, just enforced one layer down, at the model itself rather than the
+form. <code>$fillable</code> is that list:</p>
+<pre><code class="hljs language-php"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Book</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Model</span>
+</span>{
+    <span class="hljs-keyword">protected</span> <span class="hljs-variable">$fillable</span> = [
+        <span class="hljs-string">&#x27;title&#x27;</span>, <span class="hljs-string">&#x27;description&#x27;</span>, <span class="hljs-string">&#x27;year&#x27;</span>, <span class="hljs-string">&#x27;image&#x27;</span>,
+        <span class="hljs-string">&#x27;isbn&#x27;</span>, <span class="hljs-string">&#x27;publisher&#x27;</span>, <span class="hljs-string">&#x27;edition_number&#x27;</span>, <span class="hljs-string">&#x27;price&#x27;</span>,
+    ];
+
+    <span class="hljs-comment">// relationships below</span>
+}
+</code></pre>
+<p><code>Author</code> and <code>Review</code> each get the same treatment, listing their own
+columns (<code>Review</code>'s includes <code>book_id</code> and <code>user_id</code> — the two foreign
+keys — since those get set through <code>create()</code> too, not just <code>rating</code> and
+<code>comment</code>).</p>
+<h2>The relationships</h2>
+<p>Six methods, spread across four classes, cover every connection from the
+domain model: <code>Book::authors()</code> and <code>Author::books()</code> (many-to-many),
+<code>Book::reviews()</code> and <code>User::reviews()</code> (one-to-many), and
+<code>Review::book()</code>/<code>Review::user()</code> (the inverse — many reviews to one book
+or user).</p>
+<pre><code class="hljs language-php"><span class="hljs-comment">// Book.php</span>
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">authors</span>(<span class="hljs-params"></span>): <span class="hljs-title">BelongsToMany</span>
+</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">belongsToMany</span>(<span class="hljs-title class_">Author</span>::<span class="hljs-variable language_">class</span>);
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">reviews</span>(<span class="hljs-params"></span>): <span class="hljs-title">HasMany</span>
+</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">hasMany</span>(<span class="hljs-title class_">Review</span>::<span class="hljs-variable language_">class</span>);
+}
+</code></pre>
+<p><code>belongsToMany</code> is the many-to-many side — it needs a pivot table, and
+finds <code>author_book</code> the same way models find their own table: by
+convention, from the two related class names. Nothing here names
+<code>author_book</code> directly; it didn't have to, because the last topic named
+that table exactly the way Eloquent expects. <code>hasMany</code> is simpler — it
+just means &quot;look up rows in <code>reviews</code> whose <code>book_id</code> matches this book.&quot;
+<code>Author::books()</code> and <code>User::reviews()</code> are written the same two ways,
+just from the other side.</p>
+<p><code>Review::book()</code> and <code>Review::user()</code> are the relationship's inverse —
+&quot;which one book does <em>this</em> review belong to&quot; rather than &quot;which many
+reviews does this book have&quot;:</p>
+<pre><code class="hljs language-php"><span class="hljs-comment">// Review.php</span>
+<span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">book</span>(<span class="hljs-params"></span>): <span class="hljs-title">BelongsTo</span>
+</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-variable language_">$this</span>-&gt;<span class="hljs-title function_ invoke__">belongsTo</span>(<span class="hljs-title class_">Book</span>::<span class="hljs-variable language_">class</span>);
+}
+</code></pre>
+<p><code>belongsTo</code> is what a <code>foreignId</code> column on the model's own table turns
+into — the mirror image of <code>hasMany</code>, read from the side that actually
+holds the foreign key.</p>
+<h2>One piece of magic worth naming</h2>
+<p><code>$book-&gt;authors()</code> and <code>$book-&gt;authors</code> look almost identical, but do
+different things — this is the one place Eloquent quietly does more than
+a plain PHP class would. Call it as a <strong>method</strong>, and you get a query
+builder back, not results yet — useful when there's more to add before
+it runs, like <code>$book-&gt;authors()-&gt;attach($author)</code> to create an
+<code>author_book</code> row. Access it as a <strong>property</strong>, with no parentheses, and
+Eloquent runs the query for you and hands back the actual authors, as a
+<code>Collection</code>:</p>
+<pre><code class="hljs language-php"><span class="hljs-variable">$book</span>-&gt;<span class="hljs-title function_ invoke__">authors</span>()-&gt;<span class="hljs-title function_ invoke__">attach</span>(<span class="hljs-variable">$author</span>);      <span class="hljs-comment">// writes to author_book</span>
+<span class="hljs-variable">$book</span>-&gt;authors;                         <span class="hljs-comment">// reads: a Collection of Author</span>
+</code></pre>
+<p>It's worth seeing the query that property access actually runs, since a
+many-to-many's SQL isn't obvious from the model code alone the way
+<code>hasMany</code>'s is:</p>
+<pre><code class="hljs language-sql"><span class="hljs-keyword">select</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">from</span> `authors`
+<span class="hljs-keyword">inner</span> <span class="hljs-keyword">join</span> `author_book` <span class="hljs-keyword">on</span> `authors`.`id` <span class="hljs-operator">=</span> `author_book`.`author_id`
+<span class="hljs-keyword">where</span> `author_book`.`book_id` <span class="hljs-operator">=</span> ?
+</code></pre>
+<p>That's exactly the join you'd write by hand from the schema — Eloquent
+just generates it from <code>belongsToMany()</code> and the tables' own naming
+conventions, rather than you typing it out every time you need it.</p>
+<h2>Trying it yourself with <code>tinker</code></h2>
+<p>Everything above is worth poking at directly rather than just reading —
+<code>php artisan tinker</code>, run from the workspace container, drops you into an
+interactive PHP prompt with the whole app already loaded: every model,
+the real database connection, all of it, with no route or controller
+needed just to try something out.</p>
+<pre><code class="hljs">$ php artisan tinker
+&gt; $book = \App\Models\Book::create([&#x27;title&#x27; =&gt; &#x27;Dune&#x27;, &#x27;year&#x27; =&gt; 1965]);
+&gt; $author = \App\Models\Author::create([&#x27;name&#x27; =&gt; &#x27;Frank Herbert&#x27;]);
+&gt; $book-&gt;authors()-&gt;attach($author);
+&gt; $book-&gt;authors;
+= Illuminate\Database\Eloquent\Collection {
+    all: [
+      App\Models\Author {
+        id: 1,
+        name: &quot;Frank Herbert&quot;,
+        ...
+        pivot: Illuminate\Database\Eloquent\Relations\Pivot {
+          book_id: 1,
+          author_id: 1,
+        },
+      },
+    ],
+  }
+</code></pre>
+<p>That last line is the real output — a <code>Collection</code> holding one <code>Author</code>,
+with a <code>pivot</code> attribute tucked inside it. That's the actual <code>author_book</code>
+row Eloquent just created and is quietly carrying along, since it's the
+detail that made this particular <code>Author</code> show up in this particular
+<code>Book</code>'s list. Model classes need their full namespace here
+(<code>\App\Models\Book</code>, not just <code>Book</code>) — <code>tinker</code> runs outside any file
+that already has a <code>use</code> statement pulling that name in for you.</p>
+<h2>What's still missing</h2>
+<p>Data: nothing has created a real <code>Book</code> or <code>Author</code> outside of trying
+things out in <code>tinker</code> above, and nothing seeds the database with a believable
+catalogue. That's this lesson's very next (and last) topic for the model
+side — proving the schema and relationships hold with real tests — and
+Lesson 2's job for realistic demo data.</p>
+</div>
+    
+  </main>
+</body>
+</html>
