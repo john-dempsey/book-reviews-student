@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lesson 3: Full CRUD for Books — Book Reviews Tutorial</title>
-  <link rel="stylesheet" href="assets/hljs-theme.css">
-  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="../assets/hljs-theme.css">
+  <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
   <nav class="site-nav">
     <div class="site-nav-inner">
       <div class="nav-slot nav-slot-left">
-        <a class="nav-home" href="index.html" aria-label="Home">
+        <a class="nav-home" href="../index.html" aria-label="Home">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 11 12 3l9 8" />
@@ -21,7 +21,7 @@
         
       </div>
       <div class="nav-slot nav-slot-center">
-        <a class="nav-up" href="index.html">↑ Up</a>
+        <a class="nav-up" href="../index.html">↑ Up</a>
       </div>
       <div class="nav-slot nav-slot-right">
         
@@ -33,7 +33,7 @@
     
       <nav class="breadcrumb" aria-label="Breadcrumb">
         
-          <a href="index.html">Home</a>
+          <a href="../index.html">Home</a>
           <span class="breadcrumb-sep">/</span>
         
           <span aria-current="page">Lesson 3: Full CRUD for Books</span>
@@ -49,27 +49,27 @@
       <ul class="listing">
         
           <li>
-            <a href="full-crud-for-books/create-and-store.html">Create and store</a>
+            <a href="create-and-store.html">Create and store</a>
             <p>BookController@create and @store - the first form this course writes by hand, @csrf, and route model binding run in reverse to redirect straight to the book that was just created.</p>
           </li>
         
           <li>
-            <a href="full-crud-for-books/validation-and-form-repopulation.html">Validation and form repopulation</a>
+            <a href="validation-and-form-repopulation.html">Validation and form repopulation</a>
             <p>$request-&gt;validate() replaces the hand-written validator class and manual PRG flow from the PHP module - rule strings, automatic redirect-back-with-errors on failure, and old()/@error in Blade.</p>
           </li>
         
           <li>
-            <a href="full-crud-for-books/edit-update-and-image-upload.html">Edit, update, and image upload</a>
+            <a href="edit-update-and-image-upload.html">Edit, update, and image upload</a>
             <p>edit/update mirror create/store almost exactly - the interesting new ground is a form shared between the two pages, and a cover image saved to Laravel&#39;s public disk.</p>
           </li>
         
           <li>
-            <a href="full-crud-for-books/delete.html">Delete</a>
+            <a href="delete.html">Delete</a>
             <p>BookController@destroy, a spoofed DELETE request behind a confirm() dialog, and closing the orphaned-file gap the last topic left open on purpose.</p>
           </li>
         
           <li>
-            <a href="full-crud-for-books/testing-the-full-crud-flow.html">Testing the full CRUD flow</a>
+            <a href="testing-the-full-crud-flow.html">Testing the full CRUD flow</a>
             <p>Feature tests for store, update, and destroy - a validation failure that actually repopulates the form, a cover image that actually leaves storage, and one test that runs create, edit, and delete back to back.</p>
           </li>
         
